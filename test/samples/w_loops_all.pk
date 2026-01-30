@@ -1,0 +1,50 @@
+; Complete W Loop Test Suite
+; Testing all 8 loop variants from historical Plankalkül
+
+; W0 - Hidden counter (repeat n times)
+SumW0(V0[:i]) => R0[:i] {
+  0 => R0
+  W0(V0) {
+    R0 + 1 => R0
+  }
+}
+
+; W1 - Count up (0 to n-1)
+SumW1(V0[:i]) => R0[:i] {
+  0 => R0
+  W1(V0) => Z0 {
+    R0 + Z0 => R0
+  }
+}
+
+; W2 - Count down (n-1 to 0)
+SumW2(V0[:i]) => R0[:i] {
+  0 => R0
+  W2(V0) => Z0 {
+    R0 + Z0 => R0
+  }
+}
+
+; W3 - While m >= n (count down from m to n)
+RangeW3(V0[:i], V1[:i]) => R0[:i] {
+  0 => R0
+  W3(V0, V1) => Z0 {
+    R0 + Z0 => R0
+  }
+}
+
+; W4 - While m <= n (count up from m to n)
+RangeW4(V0[:i], V1[:i]) => R0[:i] {
+  0 => R0
+  W4(V0, V1) => Z0 {
+    R0 + Z0 => R0
+  }
+}
+
+; W5 - Toward target (auto-direction)
+RangeW5(V0[:i], V1[:i]) => R0[:i] {
+  0 => R0
+  W5(V0, V1) => Z0 {
+    R0 + Z0 => R0
+  }
+}

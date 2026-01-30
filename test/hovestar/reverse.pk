@@ -1,0 +1,12 @@
+(* Array reversal - linearised notation
+   Source: Hovestar Plankalkul implementation test suite
+
+   Reverses an array of m elements of type X
+   Uses W1 loop to iterate through indices
+*)
+
+Reverse(V0[:m*X]) => R0[:m*X]{
+  W1(m) => R1[:i] {
+    V0[R1[:i]:X] => R0[m-1-R1[:i]:X]
+  }
+}

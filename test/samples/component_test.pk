@@ -1,0 +1,13 @@
+; Test component indexing for chess board access
+; V0[row][col] should become pk_v0.data[row].data[col]
+
+board_test (V0) => R0 {
+  ; Access single component
+  V0[0] => R0
+
+  ; Access nested component (2D array)
+  V0[1][2] => Z0
+
+  ; Indirect index using another variable
+  V0[Z0] => Z1
+}

@@ -1,0 +1,12 @@
+; Test file for Unicode Delta notation
+; PΔ1 using actual Unicode Δ character
+
+; Chess plan using Delta prefix (Zuse's convention)
+PΔ1 (V0, V1) => R0 {
+  V0 + V1 => R0
+}
+
+; Another chess plan
+PΔ300 (V0) => R0 {
+  V0 * 8 => R0
+}

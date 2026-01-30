@@ -1,0 +1,24 @@
+; Simplified knight movement (no absolute value syntax)
+; SOURCE: ZIA-0367, page 10
+
+ | Spr(V, V) => R
+V|     0  1      0
+K|
+S|     i  i     S0
+
+ | (V - V) * (V - V) => Z
+V|   1   0     1   0      0
+K|
+S|   i   i     i   i      i
+
+ | (V - V) * (V - V) => Z
+V|   1   0     1   0      1
+K|
+S|   i   i     i   i      i
+
+ | (Z = 1) & (Z = 4) => R
+V|   0         1          0
+K|
+S|   i         i         S0
+
+FIN

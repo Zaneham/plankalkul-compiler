@@ -1,0 +1,11 @@
+; W loop test - Zuse's conditional loop
+; Repeats while ANY condition is true
+
+GCD(V0[:i], V1[:i]) => R0[:i] {
+  ; Euclidean algorithm using W loop
+  W [
+    V0 > V1 -> V0 - V1 => V0;
+    V1 > V0 -> V1 - V0 => V1
+  ]
+  V0 => R0
+}

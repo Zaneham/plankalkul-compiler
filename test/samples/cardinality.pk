@@ -1,0 +1,37 @@
+; Test: Cardinality expression N(list)
+; Tests parsing and codegen for the N(...) length/size operator
+
+; Simple cardinality
+Length(V0[:8.i]) => R0[:i] {
+  N(V0) => R0
+}
+
+; Cardinality in expression
+IsEmpty(V0[:8.i]) => R0[:S0] {
+  N(V0) = 0 => R0
+}
+
+; Cardinality comparison
+HasElements(V0[:8.i]) => R0[:S0] {
+  N(V0) > 0 => R0
+}
+
+; Cardinality in loop
+SumArray(V0[:8.i]) => R0[:i] {
+  0 => R0
+  0 => Z0
+  W1(N(V0)) => Z1 {
+    R0 + V0[Z1] => R0
+  }
+}
+
+; Double cardinality (nested)
+TotalLength(V0[:8.i], V1[:8.i]) => R0[:i] {
+  N(V0) + N(V1) => R0
+}
+
+; Cardinality with arithmetic
+AverageSize(V0[:8.i], V1[:8.i], V2[:8.i]) => R0[:i] {
+  ; Average of three array lengths
+  (N(V0) + N(V1) + N(V2)) / 3 => R0
+}

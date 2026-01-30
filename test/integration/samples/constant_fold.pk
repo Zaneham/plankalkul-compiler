@@ -1,0 +1,5 @@
+; Test constant folding optimization
+; Expected output: 42 (should be computed at compile time)
+const_fold (V0) => R0 {
+  6 * 7 => R0
+}

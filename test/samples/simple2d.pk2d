@@ -1,0 +1,14 @@
+; Simple 2D test - addition
+; SOURCE: ZIA-0367, page 1
+
+ | Add(V, V) => R
+V|     0  1      0
+K|
+S|     i  i      i
+
+ | V + V => R
+V|  0   1      0
+K|
+S|  i   i      i
+
+FIN

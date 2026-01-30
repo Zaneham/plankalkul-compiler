@@ -1,0 +1,47 @@
+; Test: Memory stress test for filter operations
+; Tests the safe allocation (alloca vs malloc) and cleanup
+
+; Simple filter - should use alloca
+SmallFilter(V0[:8.i]) => R0[:8.i] {
+  ^Z0(Z0 : V0 -> Z0 > 0) => R0
+}
+
+; Larger filter - should use malloc
+LargeFilter(V0[:1024.i]) => R0[:1024.i] {
+  ^Z0(Z0 : V0 -> Z0 > 0) => R0
+}
+
+; Multiple filters in sequence
+MultiFilter(V0[:100.i]) => R0[:100.i] {
+  ; Filter positive
+  ^Z0(Z0 : V0 -> Z0 > 0) => Z1
+  ; Filter even from result
+  ^Z0(Z0 : Z1 -> Z0 / 2 * 2 = Z0) => Z2
+  ; Filter small
+  ^Z0(Z0 : Z2 -> Z0 < 100) => R0
+}
+
+; Nested filters
+NestedFilter(V0[:50.i], V1[:50.i]) => R0[:50.i] {
+  ; Filter V0
+  ^Z0(Z0 : V0 -> Z0 > 0) => Z1
+  ; Filter V1
+  ^Z0(Z0 : V1 -> Z0 > 0) => Z2
+  ; Use both (just return first for simplicity)
+  Z1 => R0
+}
+
+; Filter in loop - tests cleanup on multiple iterations
+FilterLoop(V0[:10.i]) => R0[:i] {
+  0 => R0
+  W1(10) => Z0 {
+    ; Filter creates temporary array each iteration
+    ^Z1(Z1 : V0 -> Z1 > Z0) => Z2
+    R0 + N(Z2) => R0
+  }
+}
+
+; Very large filter - definitely needs malloc
+HugeFilter(V0[:10000.i]) => R0[:10000.i] {
+  ^Z0(Z0 : V0 -> Z0 > 0) => R0
+}

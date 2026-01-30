@@ -1,0 +1,19 @@
+; Test two blocks - sum and difference
+; SOURCE: ZIA-0367, page 1
+
+ | SumDiff(V, V) => (R, R)
+V|         0  1      0  1
+K|
+S|         i  i      i  i
+
+ | V + V => R
+V|  0   1      0
+K|
+S|  i   i      i
+
+ | V - V => R
+V|  0   1      1
+K|
+S|  i   i      i
+
+FIN

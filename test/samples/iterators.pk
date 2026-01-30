@@ -1,0 +1,33 @@
+; Test: Iterator expressions (mu and lambda)
+; Tests parsing and codegen for ux(...) and \x(...) syntax
+
+; Mu: Forward iterator - find first positive
+FindFirstPositive(V0[:8.i]) => R0[:i] {
+  ; ux(x : V0 -> x > 0) - first x > 0, scanning forward
+  uZ0(Z0 : V0 -> Z0 > 0) => R0
+}
+
+; Lambda: Backward iterator - find last positive
+FindLastPositive(V0[:8.i]) => R0[:i] {
+  ; \x(x : V0 -> x > 0) - last x > 0, scanning backward
+  \Z0(Z0 : V0 -> Z0 > 0) => R0
+}
+
+; Mu with equality check
+FindValue(V0[:8.i], V1[:i]) => R0[:i] {
+  ; Find first occurrence of V1
+  uZ0(Z0 : V0 -> Z0 = V1) => R0
+}
+
+; Lambda with equality check
+FindLastValue(V0[:8.i], V1[:i]) => R0[:i] {
+  ; Find last occurrence of V1
+  \Z0(Z0 : V0 -> Z0 = V1) => R0
+}
+
+; Combined iterators
+FindMiddle(V0[:8.i]) => (R0[:i], R1[:i]) {
+  ; Find first and last positive
+  uZ0(Z0 : V0 -> Z0 > 0) => R0
+  \Z0(Z0 : V0 -> Z0 > 0) => R1
+}

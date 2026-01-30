@@ -1,0 +1,27 @@
+(* Bubble sort - linearised notation
+   Source: Hovestar Plankalkul implementation test suite
+
+   Sorts an array of m elements using bubble sort algorithm.
+   Demonstrates:
+   - W1 loop (count up)
+   - W loop (while condition true)
+   - Nested conditionals with ->
+   - Array element swapping
+*)
+
+Sort(V0[:m*X]) => R0[:m*X] {
+  V0[:m*X] => Z0[:m*X]
+  W1(m-1) => R1[:i] {
+    W{
+      R1[:i] > 0  -> {
+        Z0[R1[:i]:X] < Z0[R1[:i]-1:X] -> {
+          Z0[R1[:i]:X] => R2[:X]
+          Z0[R1[:i]-1:X] => Z0[R1[:i]:X]
+          R2[:X] => Z0[R1[:i]-1:X]
+        }
+        R1[:i] -1 => R1[:i]
+      }
+    }
+  }
+  Z0[:m*X] => R0[:m*X]
+}

@@ -1,0 +1,8 @@
+; Countdown using W2 (reverse iteration)
+; Expected output: 45 (9+8+7+6+5+4+3+2+1+0)
+countdown (V0) => R0 {
+  0 => R0
+  W2(V0) => Z0 {
+    R0 + Z0 => R0
+  }
+}

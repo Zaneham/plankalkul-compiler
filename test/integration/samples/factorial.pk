@@ -1,0 +1,8 @@
+; Factorial using W1 loop
+; Expected output: 120 (5!)
+factorial (V0) => R0 {
+  1 => R0
+  W1(V0) => Z0 {
+    R0 * (Z0 + 1) => R0
+  }
+}

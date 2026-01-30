@@ -1,0 +1,13 @@
+(* Factorial function - linearised notation
+   Source: Hovestar Plankalkul implementation test suite
+   Adapted for plankalkul-compiler test suite
+
+   Computes n! = 1 * 2 * 3 * ... * n
+*)
+
+Factorial(V0[:i])=>R0[:i]{
+  1 => R0[:i]
+  W1(V0[:i]) => R1[:i] {
+    R0[:i] * (R1[:i]+1) => R0[:i]
+  }
+}

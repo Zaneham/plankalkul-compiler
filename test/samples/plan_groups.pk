@@ -1,0 +1,22 @@
+; Test: Plan groups (P<group>.<number> notation)
+; Zuse organised plans into numbered groups, like chapters
+
+; Group 1: Arithmetic operations
+P1.1 add (V0, V1) => R0 {
+  V0 + V1 => R0
+}
+
+P1.2 sub (V0, V1) => R0 {
+  V0 - V1 => R0
+}
+
+; Group 2: Multiplication operations
+P2.1 mul (V0, V1) => R0 {
+  V0 * V1 => R0
+}
+
+; Plan that uses group.number calling convention
+calc (V0, V1) => R0 {
+  P1.1(V0, V1) => Z0
+  P2.1(Z0, V1) => R0
+}

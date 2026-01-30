@@ -1,0 +1,5 @@
+(library
+ (name parser)
+ (public_name plankalkul.parser)
+ (libraries lexer ast provenance)
+ (preprocess (pps ppx_deriving.show ppx_deriving.eq)))

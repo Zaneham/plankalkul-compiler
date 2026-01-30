@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: 4.14.x
+
+      - name: Install dependencies
+        run: opam install . --deps-only --yes
+
+      - name: Build
+        run: opam exec -- dune build --release
+
+      - name: Prepare binary
+        run: |
+          mkdir -p dist
+          cp _build/default/src/bin/plankalkul.exe dist/plankalkul-linux-x64
+          chmod +x dist/plankalkul-linux-x64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plankalkul-linux-x64
+          path: dist/plankalkul-linux-x64
+
+  build-macos-intel:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: 4.14.x
+
+      - name: Install dependencies
+        run: opam install . --deps-only --yes
+
+      - name: Build
+        run: opam exec -- dune build --release
+
+      - name: Prepare binary
+        run: |
+          mkdir -p dist
+          cp _build/default/src/bin/plankalkul.exe dist/plankalkul-darwin-x64
+          chmod +x dist/plankalkul-darwin-x64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plankalkul-darwin-x64
+          path: dist/plankalkul-darwin-x64
+
+  build-macos-arm:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: 4.14.x
+
+      - name: Install dependencies
+        run: opam install . --deps-only --yes
+
+      - name: Build
+        run: opam exec -- dune build --release
+
+      - name: Prepare binary
+        run: |
+          mkdir -p dist
+          cp _build/default/src/bin/plankalkul.exe dist/plankalkul-darwin-arm64
+          chmod +x dist/plankalkul-darwin-arm64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plankalkul-darwin-arm64
+          path: dist/plankalkul-darwin-arm64
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: 4.14.x
+
+      - name: Install dependencies
+        run: opam install . --deps-only --yes
+
+      - name: Build
+        run: opam exec -- dune build --release
+
+      - name: Prepare binary
+        run: |
+          mkdir -p dist
+          cp _build/default/src/bin/plankalkul.exe dist/plankalkul-windows-x64.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plankalkul-windows-x64
+          path: dist/plankalkul-windows-x64.exe
+
+  release:
+    needs: [build-linux, build-macos-intel, build-macos-arm, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir release
+          cp artifacts/plankalkul-linux-x64/plankalkul-linux-x64 release/
+          cp artifacts/plankalkul-darwin-x64/plankalkul-darwin-x64 release/
+          cp artifacts/plankalkul-darwin-arm64/plankalkul-darwin-arm64 release/
+          cp artifacts/plankalkul-windows-x64/plankalkul-windows-x64.exe release/
+          cd release
+          sha256sum * > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release/plankalkul-linux-x64
+            release/plankalkul-darwin-x64
+            release/plankalkul-darwin-arm64
+            release/plankalkul-windows-x64.exe
+            release/checksums.txt
+          body: |
+            ## Plankalkül Compiler
+
+            Pre-built binaries for the Plankalkül compiler.
+
+            ### Installation
+
+            Download the binary for your platform and add it to your PATH:
+
+            - **Linux**: `plankalkul-linux-x64`
+            - **macOS Intel**: `plankalkul-darwin-x64`
+            - **macOS Apple Silicon**: `plankalkul-darwin-arm64`
+            - **Windows**: `plankalkul-windows-x64.exe`
+
+            ### Quick Start
+
+            ```bash
+            # Compile to C
+            plankalkul --emit-c program.pk > program.c
+            gcc -o program program.c
+            ./program
+            ```
+          draft: false
+          prerelease: false

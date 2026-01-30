@@ -1,0 +1,11 @@
+; Nested loops - multiplication table sum
+; Expected output: 100 (sum of 1*1 + 1*2 + ... + 4*4 = sum of products)
+; Actually: sum i=0..3, j=0..3 of (i+1)*(j+1) = (1+2+3+4)^2 = 100
+nested (V0) => R0 {
+  0 => R0
+  W1(V0) => Z0 {
+    W1(V0) => Z1 {
+      R0 + (Z0 + 1) * (Z1 + 1) => R0
+    }
+  }
+}

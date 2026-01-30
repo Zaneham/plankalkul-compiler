@@ -1,0 +1,5 @@
+(library
+ (name ast)
+ (public_name plankalkul.ast)
+ (libraries provenance)
+ (preprocess (pps ppx_deriving.show ppx_deriving.eq)))

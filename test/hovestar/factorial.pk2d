@@ -1,0 +1,25 @@
+; Factorial function - 2D notation
+; Source: Hovestar Plankalkul implementation test suite
+; Rewritten in standard Plankalkül notation
+
+ | factorial(V) => R
+V|           0      0
+K|
+S|           i      i
+
+ | 1 => R
+V|      0
+K|
+S|      i
+
+ | W1(V) => Z
+V|    0       0
+K|
+S|    i       i
+
+ | R * (Z + 1) => R
+V|  0    0         0
+K|
+S|  i    i         i
+
+FIN

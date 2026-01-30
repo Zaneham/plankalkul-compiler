@@ -1,0 +1,5 @@
+; Single plan test for Delta notation
+
+PΔ1 (V0, V1) => R0 {
+  V0 + V1 => R0
+}

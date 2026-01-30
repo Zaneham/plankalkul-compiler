@@ -1,0 +1,5 @@
+(library
+ (name errors)
+ (public_name plankalkul.errors)
+ (modules error_types error_render)
+ (preprocess (pps ppx_deriving.show)))

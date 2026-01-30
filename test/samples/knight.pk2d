@@ -1,0 +1,26 @@
+; Springer (Knight) movement function
+; SOURCE: ZIA-0367, page 10
+; ORIGINAL: (Δx=±1 ∧ Δy=±2) ∨ (Δx=±2 ∧ Δy=±1) ~ Spr(x,y)
+; V0 and V1 are coordinate pairs (x,y)
+
+ | Spr(V, V) => R
+V|     0  1      0
+K|
+S|   2.i 2.i    S0
+
+ | |V - V| => Z
+V|   1   0       0
+K|   0   0
+S|   i   i       i
+
+ | |V - V| => Z
+V|   1   0       1
+K|   1   1
+S|   i   i       i
+
+ | (Z = 1) & (Z = 2) | (Z = 2) & (Z = 1) => R
+V|   0         1         0         1       0
+K|
+S|   i         i         i         i      S0
+
+END

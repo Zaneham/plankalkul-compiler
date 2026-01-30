@@ -1,0 +1,6 @@
+; Absolute difference of two numbers
+; Expected output: 25 (|17 - 42| = 25)
+abs_diff (V0, V1) => R0 {
+  V0 - V1 => R0
+  R0 < 0 -> { 0 - R0 => R0 }
+}

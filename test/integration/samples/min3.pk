@@ -1,0 +1,7 @@
+; Minimum of three numbers
+; Expected output: 5
+min3 (V0, V1, V2) => R0 {
+  V0 => R0
+  V1 < R0 -> { V1 => R0 }
+  V2 < R0 -> { V2 => R0 }
+}

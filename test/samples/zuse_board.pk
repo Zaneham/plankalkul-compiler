@@ -1,0 +1,44 @@
+; Zuse's Board Zone Functions
+; Source: ZIA-0368, pages 15, 18 - "schachprogramme_1941"
+;
+; Historical functions for board position analysis
+
+; Ben(x,z) - Adjacent cells (benachbart = neighboring)
+; Two squares are adjacent if their coordinate differences are both <= 1
+Ben(V0[:i], V1[:i], V2[:i], V3[:i]) => R0[:S0] {
+  |V2 - V0| => Z0  ; |Δξ|
+  |V3 - V1| => Z1  ; |Δη|
+  (Z0 <= 1) & (Z1 <= 1) & ((Z0 + Z1) > 0) => R0
+}
+
+; Eck(x) - Corner detection (Ecke = corner)
+; True if position is one of the four corners
+Eck(V0[:i], V1[:i]) => R0[:S0] {
+  ; Corners are (0,0), (0,7), (7,0), (7,7)
+  ((V0 = 0) | (V0 = 7)) & ((V1 = 0) | (V1 = 7)) => R0
+}
+
+; Kant(x) - Edge detection (Kante = edge)
+; True if position is on any edge of the board
+Kant(V0[:i], V1[:i]) => R0[:S0] {
+  (V0 = 0) | (V0 = 7) | (V1 = 0) | (V1 = 7) => R0
+}
+
+; Farb(x) - Color function for square
+; Returns 0 for dark squares, 1 for light squares
+; Historical: alternating pattern based on coordinates
+Farb(V0[:i], V1[:i]) => R0[:S0] {
+  ; Light square if (col + row) is even
+  ((V0 + V1) / 2) * 2 = (V0 + V1) => R0
+}
+
+; Quadr(x) - Quadrant function
+; Historical: (ξ₂, η₂) where ξ₂, η₂ ∈ {0, 1}
+; Returns quadrant number 0-3
+Quadr(V0[:i], V1[:i]) => R0[:i] {
+  ; Quadrant = 2*(row>=4) + (col>=4)
+  0 => Z0
+  V0 >= 4 -> 1 => Z0
+  V1 >= 4 -> Z0 + 2 => Z0
+  Z0 => R0
+}

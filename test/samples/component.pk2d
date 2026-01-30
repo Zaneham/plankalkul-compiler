@@ -1,0 +1,20 @@
+; Component access test (K row)
+; SOURCE: ZIA-0367, page 5
+; V0 is a pair, access V0[0] and V0[1]
+
+ | Swap(V) => R
+V|      0      0
+K|
+S|    2.i    2.i
+
+ | V  => R
+V|  0     0
+K|  1     0
+S|  i     i
+
+ | V  => R
+V|  0     0
+K|  0     1
+S|  i     i
+
+FIN

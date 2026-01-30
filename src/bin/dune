@@ -1,0 +1,4 @@
+(executable
+ (name plankalkul)
+ (public_name plankalkul)
+ (libraries lexer parser ast provenance codegen typing errors))

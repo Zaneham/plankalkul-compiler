@@ -1,0 +1,61 @@
+; Zuse's 8-Direction System
+; Source: ZIA-0368, page 18 - "schachprogramme_1941"
+;
+; Historical direction functions for ray-casting moves:
+;   Orthogonal: Nord, Süd, Ost, West
+;   Diagonal: NO, SO, SW, NW
+;
+; Each takes (col, row, steps) and returns new (col, row)
+
+; Nord - Move north (+row)
+Nord(V0[:i], V1[:i], V2[:i]) => (R0[:i], R1[:i]) {
+  V0 => R0
+  V1 + V2 => R1
+}
+
+; Sued - Move south (-row)
+Sued(V0[:i], V1[:i], V2[:i]) => (R0[:i], R1[:i]) {
+  V0 => R0
+  V1 - V2 => R1
+}
+
+; Ost - Move east (+col)
+Ost(V0[:i], V1[:i], V2[:i]) => (R0[:i], R1[:i]) {
+  V0 + V2 => R0
+  V1 => R1
+}
+
+; West - Move west (-col)
+West(V0[:i], V1[:i], V2[:i]) => (R0[:i], R1[:i]) {
+  V0 - V2 => R0
+  V1 => R1
+}
+
+; NO - Northeast (+col, +row)
+NO(V0[:i], V1[:i], V2[:i]) => (R0[:i], R1[:i]) {
+  V0 + V2 => R0
+  V1 + V2 => R1
+}
+
+; SO - Southeast (+col, -row)
+SO(V0[:i], V1[:i], V2[:i]) => (R0[:i], R1[:i]) {
+  V0 + V2 => R0
+  V1 - V2 => R1
+}
+
+; SW - Southwest (-col, -row)
+SW(V0[:i], V1[:i], V2[:i]) => (R0[:i], R1[:i]) {
+  V0 - V2 => R0
+  V1 - V2 => R1
+}
+
+; NW - Northwest (-col, +row)
+NW(V0[:i], V1[:i], V2[:i]) => (R0[:i], R1[:i]) {
+  V0 - V2 => R0
+  V1 + V2 => R1
+}
+
+; InBounds - Check if position is on board (0-7)
+InBounds(V0[:i], V1[:i]) => R0[:S0] {
+  (V0 >= 0) & (V0 <= 7) & (V1 >= 0) & (V1 <= 7) => R0
+}

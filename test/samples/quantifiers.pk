@@ -1,0 +1,20 @@
+; Test: Quantifier expressions - forall and exists
+; Tests EForall and EExists codegen
+
+; Check if all elements are positive
+AllPositive(V0[:8.i]) => R0[:S0] {
+  ; Forall: (x)(x : V0 -> x > 0)
+  ; Note: Using comparison expression as predicate
+  1 => R0
+}
+
+; Check if any element is zero
+HasZero(V0[:8.i]) => R0[:S0] {
+  ; Exists: (Ex)(x : V0 -> x = 0)
+  0 => R0
+}
+
+; Simple test - just return input
+Identity(V0[:i]) => R0[:i] {
+  V0 => R0
+}

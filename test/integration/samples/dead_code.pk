@@ -1,0 +1,6 @@
+; Test dead code elimination
+; Expected output: 1 (the false branch should be eliminated)
+dead_code (V0) => R0 {
+  1 => R0
+  false -> { 999 => R0 }
+}

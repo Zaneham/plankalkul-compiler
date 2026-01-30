@@ -1,0 +1,8 @@
+; Test Greek letters - Zuse used ξ (xi) for columns and η (eta) for rows
+; Unicode characters should be normalized to ASCII equivalents
+
+ChessPos(V0[:i], V1[:i]) => R0[:i] {
+  ; Using normalized names: xi = column, eta = row
+  ; In source can write: ξ and η (normalized by lexer)
+  V0 + V1 => R0
+}

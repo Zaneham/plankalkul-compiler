@@ -1,0 +1,59 @@
+; Test: Recursive plan calls
+; Tests recursion detection and stack depth safety checks
+
+; Simple recursion: Factorial
+Factorial(V0[:i]) => R0[:i] {
+  ; Base case: 0! = 1
+  V0 = 0 -> {
+    1 => R0
+    FIN
+  }
+  ; Recursive case: n! = n * (n-1)!
+  V0 - 1 => Z0
+  Factorial(Z0) => Z1
+  V0 * Z1 => R0
+}
+
+; Tail-recursive sum
+SumTo(V0[:i]) => R0[:i] {
+  ; Sum of 1 + 2 + ... + V0
+  V0 = 0 -> {
+    0 => R0
+    FIN
+  }
+  V0 - 1 => Z0
+  SumTo(Z0) => Z1
+  V0 + Z1 => R0
+}
+
+; Fibonacci (doubly recursive)
+Fib(V0[:i]) => R0[:i] {
+  ; F(0) = 0
+  V0 = 0 -> {
+    0 => R0
+    FIN
+  }
+  ; F(1) = 1
+  V0 = 1 -> {
+    1 => R0
+    FIN
+  }
+  ; F(n) = F(n-1) + F(n-2)
+  V0 - 1 => Z0
+  V0 - 2 => Z1
+  Fib(Z0) => Z2
+  Fib(Z1) => Z3
+  Z2 + Z3 => R0
+}
+
+; GCD using Euclidean algorithm
+GCD(V0[:i], V1[:i]) => R0[:i] {
+  ; Base case: gcd(a, 0) = a
+  V1 = 0 -> {
+    V0 => R0
+    FIN
+  }
+  ; Recursive case: gcd(a, b) = gcd(b, a mod b)
+  V0 - (V0 / V1 * V1) => Z0  ; V0 mod V1
+  GCD(V1, Z0) => R0
+}

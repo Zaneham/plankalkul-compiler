@@ -1,0 +1,7 @@
+; Plankalkül Compiler Test Suite
+; Run with: dune test
+
+(test
+ (name test_main)
+ (libraries lexer parser typing codegen ast alcotest str)
+ (modules test_main test_lexer test_parser test_types test_codegen))

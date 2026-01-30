@@ -1,0 +1,45 @@
+# OCaml/Dune
+_build/
+_opam/
+*.install
+*.merlin
+.merlin
+
+# Editor
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.exe
+*.native
+*.byte
+*.cmo
+*.cmi
+*.cma
+*.cmx
+*.cmxa
+*.cmxs
+*.annot
+
+# LLVM
+*.ll
+*.bc
+*.s
+
+# Test outputs
+test/_output/
+test/integration/_build/
+
+# Local config
+.env
+.envrc

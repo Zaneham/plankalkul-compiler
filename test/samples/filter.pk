@@ -1,0 +1,16 @@
+; Test: Filter operations
+; Tests EFilterSet and EFilterSeq codegen
+
+; Filter to keep only positive elements
+; Note: This is a placeholder structure - full filter syntax
+; would need parser support for the caret notation
+
+DoubleAll(V0[:i]) => R0[:i] {
+  V0 * 2 => R0
+}
+
+; Count elements
+CountArray(V0[:8.i]) => R0[:i] {
+  ; Use cardinality N(list)
+  0 => R0
+}

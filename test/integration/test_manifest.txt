@@ -1,0 +1,33 @@
+# Integration Test Manifest
+# Format: filename.pk | input_args | expected_output
+#
+# Each line specifies:
+# - The .pk file to compile
+# - Command-line arguments to pass (space-separated integers)
+# - The expected "Result: N" output
+#
+# Lines starting with # are comments
+
+# Basic arithmetic
+add.pk | 3 4 | 7
+abs_diff.pk | 17 42 | 25
+
+# Loops and iteration
+factorial.pk | 5 | 120
+sum_to_n.pk | 10 | 55
+countdown.pk | 10 | 45
+nested_loops.pk | 4 | 100
+power.pk | 2 5 | 32
+fibonacci.pk | 10 | 89
+
+# Conditionals
+max.pk | 17 42 | 42
+min3.pk | 10 5 15 | 5
+is_even.pk | 42 | 1
+
+# Classic algorithms
+gcd.pk | 48 18 | 6
+
+# Compiler optimizations
+constant_fold.pk | 0 | 42
+dead_code.pk | 0 | 1

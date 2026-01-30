@@ -1,0 +1,19 @@
+; Array and Tuple Literal Test
+; Array syntax: [a, b, c]
+; Tuple syntax: (a, b) - only works with literal values
+
+; Initialize array with literal
+InitArray() => R0[:8.i] {
+  [0, 1, 2, 3, 4, 5, 6, 7] => R0
+}
+
+; Return a tuple (sum, difference) - uses multiple returns
+SumDiff(V0[:i], V1[:i]) => (R0[:i], R1[:i]) {
+  V0 + V1 => R0
+  V0 - V1 => R1
+}
+
+; Create tuple literal with constants
+MakeConstants() => R0 {
+  (42, 100) => R0
+}

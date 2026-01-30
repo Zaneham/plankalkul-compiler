@@ -1,0 +1,33 @@
+; Test: Full quantifier expressions
+; Tests parsing and codegen for (x)(...) and (Ex)(...) syntax
+
+; Forall: Check if all elements in array are positive
+AllPositive(V0[:8.i]) => R0[:S0] {
+  ; (x)(x : V0 -> x > 0) - forall x in V0, x > 0
+  (Z0)(Z0 : V0 -> Z0 > 0) => R0
+}
+
+; Exists: Check if any element is zero
+; Note: Use (E Z0) with space to properly tokenize as exists
+HasZero(V0[:8.i]) => R0[:S0] {
+  ; (Ex)(x : V0 -> x = 0) - exists x in V0 such that x = 0
+  (E Z0)(Z0 : V0 -> Z0 = 0) => R0
+}
+
+; Forall with complex predicate
+AllInRange(V0[:8.i], V1[:i], V2[:i]) => R0[:S0] {
+  ; All elements between V1 and V2
+  (Z0)(Z0 : V0 -> Z0 >= V1 & Z0 <= V2) => R0
+}
+
+; Exists with negation
+HasNegative(V0[:8.i]) => R0[:S0] {
+  ; Some element is less than zero
+  (E Z0)(Z0 : V0 -> Z0 < 0) => R0
+}
+
+; Combined quantifiers
+AllPositiveOrZero(V0[:8.i]) => R0[:S0] {
+  ; None are negative (all >= 0)
+  (Z0)(Z0 : V0 -> !(Z0 < 0)) => R0
+}

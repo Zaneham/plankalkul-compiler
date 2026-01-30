@@ -1,0 +1,31 @@
+; Test quantifiers and filter expressions
+
+; Forall: check all elements > 0
+all_positive (V0[:10*A10]) => R0 {
+  (Z0)(Z0 : V0 -> Z0 > 0) => R0
+}
+
+; Exists: check if any element = 0
+has_zero (V0[:10*A10]) => R0 {
+  (EZ0)(Z0 : V0 -> Z0 = 0) => R0
+}
+
+; Find unique: first element > 5
+first_big (V0[:10*A10]) => R0 {
+  'Z0(Z0 : V0 -> Z0 > 5) => R0
+}
+
+; Filter set: all elements > 5
+filter_big (V0[:10*A10]) => R0 {
+  ^Z0(Z0 : V0 -> Z0 > 5) => R0
+}
+
+; Filter sequence: all elements < 10 (preserves order)
+filter_small (V0[:10*A10]) => R0 {
+  ^^Z0(Z0 : V0 -> Z0 < 10) => R0
+}
+
+; Cardinality: length of array
+length (V0[:10*A10]) => R0 {
+  N(V0) => R0
+}

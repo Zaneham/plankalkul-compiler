@@ -1,0 +1,32 @@
+; Test: Full filter expressions
+; Tests parsing and codegen for ^x(...) and ^^x(...) syntax
+
+; Simple filter test - just double values
+DoubleAll(V0[:i]) => R0[:i] {
+  V0 * 2 => R0
+}
+
+; Filter sequence: Get all even elements (preserves order)
+FilterEven(V0[:8.i]) => R0[:8.i] {
+  ; ^^x(x : V0 -> x / 2 * 2 = x)
+  ^^Z0(Z0 : V0 -> Z0 / 2 * 2 = Z0) => R0
+}
+
+; Find unique: First element matching predicate
+FindFirst(V0[:8.i], V1[:i]) => R0[:i] {
+  ; 'x(x : V0 -> x = V1) - first element equal to V1
+  'Z0(Z0 : V0 -> Z0 = V1) => R0
+}
+
+; Filter with multiple conditions
+FilterRange(V0[:8.i], V1[:i], V2[:i]) => R0[:8.i] {
+  ; Keep only elements in [V1, V2]
+  ^Z0(Z0 : V0 -> Z0 >= V1 & Z0 <= V2) => R0
+}
+
+; Nested filter - filter then count
+CountPositive(V0[:8.i]) => R0[:i] {
+  ; First filter, then get cardinality
+  ^Z0(Z0 : V0 -> Z0 > 0) => Z1
+  N(Z1) => R0
+}

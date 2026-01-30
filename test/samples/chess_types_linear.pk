@@ -1,0 +1,5 @@
+; Chess board type test - using historical S1.n notation (linear format)
+
+ChessTest(V0[:S1.4], V1[:S1.4]) => R0[:S1.4] {
+  V0 + V1 => R0
+}

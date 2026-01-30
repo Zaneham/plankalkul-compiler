@@ -1,0 +1,9 @@
+; Tuple literal test - uses (a, b) syntax
+MakePair(V0[:i], V1[:i]) => R0 {
+  (V0, V1) => R0
+}
+
+; Tuple with literals
+Constants() => R0 {
+  (42, 100) => R0
+}

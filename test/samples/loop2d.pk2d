@@ -1,0 +1,19 @@
+; Loop test in 2D notation
+; SOURCE: ZIA-0367, page 5
+
+ | Factorial(V) => R
+V|          0      0
+K|
+S|          i      i
+
+ | 1 => R
+V|      0
+K|
+S|      i
+
+ | W1(V) => R [R * R => R ]
+V|    0      1  0   1      0
+K|
+S|    i      i  i   i      i
+
+FIN

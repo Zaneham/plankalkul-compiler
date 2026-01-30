@@ -1,0 +1,14 @@
+; Greatest Common Divisor (Euclidean algorithm)
+; A classic algorithm - would have been known to Zuse
+; Expected output: 6 (GCD of 48 and 18)
+gcd (V0, V1) => R0 {
+  V0 => R0
+  V1 => Z0
+  W {
+    Z0 > 0 -> {
+      R0 - (R0 / Z0) * Z0 => Z1
+      Z0 => R0
+      Z1 => Z0
+    }
+  }
+}

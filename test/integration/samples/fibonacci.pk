@@ -1,0 +1,17 @@
+; Fibonacci sequence
+; Returns F(N+1) where F(0)=0, F(1)=1
+; Expected output: 89 (F(11) when N=10)
+fibonacci (V0) => R0 {
+  0 => Z0
+  1 => Z1
+  V0 => Z2
+  W {
+    Z2 > 0 -> {
+      Z0 + Z1 => R0
+      Z1 => Z0
+      R0 => Z1
+      Z2 - 1 => Z2
+    }
+  }
+  Z1 => R0
+}

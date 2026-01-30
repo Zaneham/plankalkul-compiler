@@ -1,0 +1,5 @@
+(library
+ (name typing)
+ (public_name plankalkul.typing)
+ (modules infer check resolve recursion)
+ (libraries ast))

@@ -1,0 +1,8 @@
+; Sum 1 to N using W1 loop
+; Expected output: 55 (sum 1..10)
+sum_to_n (V0) => R0 {
+  0 => R0
+  W1(V0) => Z0 {
+    R0 + Z0 + 1 => R0
+  }
+}

@@ -1,0 +1,5 @@
+; Simple addition
+; Expected output: 7
+add (V0, V1) => R0 {
+  V0 + V1 => R0
+}

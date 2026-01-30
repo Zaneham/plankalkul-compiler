@@ -1,0 +1,39 @@
+; Zuse's Knight Move Validation (Springer)
+; Source: ZIA-0367, page 10 - "logik_1941"
+;
+; Historical formula from manuscripts:
+;   Spr(x,y) ~ (|Δξ|=1 ∧ |Δη|=2) ∨ (|Δξ|=2 ∧ |Δη|=1)
+;
+; Where:
+;   ξ (xi) = column coordinate (0-7)
+;   η (eta) = row coordinate (0-7)
+;   Δξ = x_col - y_col (column difference)
+;   Δη = x_row - y_row (row difference)
+
+Spr(V0[:i], V1[:i], V2[:i], V3[:i]) => R0[:S0] {
+  ; V0 = from_col (ξ₁), V1 = from_row (η₁)
+  ; V2 = to_col (ξ₂), V3 = to_row (η₂)
+
+  ; Calculate absolute differences
+  |V2 - V0| => Z0  ; |Δξ|
+  |V3 - V1| => Z1  ; |Δη|
+
+  ; Knight move: (|Δξ|=1 ∧ |Δη|=2) ∨ (|Δξ|=2 ∧ |Δη|=1)
+  ((Z0 = 1) & (Z1 = 2)) | ((Z0 = 2) & (Z1 = 1)) => R0
+}
+
+; Diagonal move check (Läufer/Bishop)
+; Historical: |Δξ| = |Δη| ~ Lf(x,y)
+Diag(V0[:i], V1[:i], V2[:i], V3[:i]) => R0[:S0] {
+  |V2 - V0| => Z0
+  |V3 - V1| => Z1
+  (Z0 = Z1) & (Z0 > 0) => R0
+}
+
+; Orthogonal move check (Turm/Rook)
+; Historical: (Δξ=0) ∨ (Δη=0) ~ Turm(x,y)
+Orth(V0[:i], V1[:i], V2[:i], V3[:i]) => R0[:S0] {
+  V2 - V0 => Z0
+  V3 - V1 => Z1
+  ((Z0 = 0) & (Z1 != 0)) | ((Z1 = 0) & (Z0 != 0)) => R0
+}

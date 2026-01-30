@@ -1,0 +1,6 @@
+; Simplest possible Plankalkül program
+; Just assigns a value
+
+Add(V0, V1) => R0 {
+  V0 + V1 => R0
+}

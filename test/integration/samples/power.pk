@@ -1,0 +1,8 @@
+; Power function: V0 ^ V1
+; Expected output: 32 (2^5 = 32)
+power (V0, V1) => R0 {
+  1 => R0
+  W1(V1) => Z0 {
+    R0 * V0 => R0
+  }
+}

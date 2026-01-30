@@ -1,0 +1,27 @@
+; Chess board access using Zuse's component indexing
+; Historical format: m*n*T for multi-dimensional arrays
+; V0 is an 8x8 board of 4-bit pieces
+
+; Access element at row 2, column 3 of the board
+board_access (V0[:8*8*S1.4]) => R0 {
+  ; Single dimension access - first row
+  V0[0] => Z0
+
+  ; Multi-dimension access: row 2, column 3
+  V0[2][3] => R0
+}
+
+; Using dotted notation (Zuse's style): V0[2.3] means row 2, col 3
+dotted_access (V0[:8*8*S1.4]) => R0 {
+  V0[2.3] => R0
+}
+
+; Sum all elements using nested W1 loops (proper 2D access)
+board_sum (V0[:8*8*A10]) => R0 {
+  0 => R0
+  W1(8) => Z0 {
+    W1(8) => Z1 {
+      R0 + V0[Z0][Z1] => R0
+    }
+  }
+}

@@ -1,0 +1,14 @@
+; Factorial in Plankalkül (linearised notation)
+; Computes n! iteratively
+;
+; From Hovestar test suite, adapted for this compiler
+
+Factorial(V0) => R0 {
+  ; R0 = 1 (accumulator)
+  1 => R0
+
+  ; Loop from 1 to V0, multiplying
+  W1(V0) => Z0 {
+    R0 * (Z0 + 1) => R0
+  }
+}

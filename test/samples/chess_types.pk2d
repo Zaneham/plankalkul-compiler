@@ -1,0 +1,14 @@
+; Chess board type test - using historical S1.n notation
+; SOURCE: ZIA-0367/0368, based on Zuse's 4-bit piece encoding
+
+ | ChessTest(V, V) => R
+V|          0  1      0
+K|
+S|       S1.4  S1.4   S1.4
+
+ | V + V => R
+V|  0   1      0
+K|
+S| S1.4 S1.4  S1.4
+
+FIN

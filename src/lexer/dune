@@ -1,0 +1,6 @@
+(library
+ (name lexer)
+ (public_name plankalkul.lexer)
+ (modules tokens lexer_linear grid lexer_2d)
+ (libraries str provenance)
+ (preprocess (pps ppx_deriving.show ppx_deriving.eq)))

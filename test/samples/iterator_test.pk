@@ -1,0 +1,11 @@
+; Test µ (mu) forward iterator
+; Find first element > 5 in array
+find_first (V0[:10*A10]) => R0 {
+  uZ0(Z0 : V0 -> Z0 > 5) => R0
+}
+
+; Test λ (lambda) backward iterator
+; Find last element < 10 in array
+find_last (V0[:10*A10]) => R0 {
+  \Z0(Z0 : V0 -> Z0 < 10) => R0
+}

@@ -1,0 +1,7 @@
+; Check if a number is even
+; Returns 1 if even, 0 if odd
+; Expected output: 1 (42 is even)
+is_even (V0) => R0 {
+  0 => R0
+  V0 - (V0 / 2) * 2 = 0 -> { 1 => R0 }
+}

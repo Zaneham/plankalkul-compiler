@@ -1,0 +1,22 @@
+; Test file for Delta notation and truth tables
+; Based on Zuse's manuscripts (ZIA-0368, ZIA-0410)
+
+; Truth table - piece movement validation
+TABLE valid_move {
+  on_board piece_type | can_move
+  -        -          | -
+  -        +          | -
+  +        -          | -
+  +        +          | +
+}
+
+; A simple plan using Delta prefix notation
+; PΔ1 - First chess-related plan
+P Delta 1 (V0, V1) => R0 {
+  V0 + V1 => R0
+}
+
+; Another plan using standard notation
+P2 (V0) => R0 {
+  V0 * 2 => R0
+}

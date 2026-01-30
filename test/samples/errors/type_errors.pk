@@ -1,0 +1,9 @@
+; Test file with intentional type errors
+
+type_test (V0[:0], V1[:A10]) => R0[:0] {
+  ; Error: Assigning integer to bit variable
+  V1 => R0
+
+  ; Error: Logical AND with non-boolean operand
+  V0 & V1 => Z0
+}

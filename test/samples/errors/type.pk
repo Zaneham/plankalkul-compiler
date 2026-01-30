@@ -1,0 +1,32 @@
+; Test: Intentional type errors for error message testing
+; This file contains type mismatches to test type checking
+
+; Assign array to scalar
+ArrayToScalar(V0[:8.i]) => R0[:i] {
+  ; V0 is an array, R0 is scalar
+  V0 => R0
+}
+
+; Arithmetic on boolean
+BoolArithmetic(V0[:S0]) => R0[:i] {
+  ; V0 is a bit, can't add integers
+  V0 + 1 => R0
+}
+
+; Compare incompatible types
+BadCompare(V0[:i], V1[:8.i]) => R0[:S0] {
+  ; Comparing scalar to array
+  V0 = V1 => R0
+}
+
+; Wrong argument count
+WrongArgCount(V0[:i]) => R0[:i] {
+  ; Assuming Add takes 2 args
+  Add(V0) => R0
+}
+
+; Index out of range (semantic, not type)
+BadIndex(V0[:8.i]) => R0[:i] {
+  ; Index 100 on 8-element array
+  V0[100] => R0
+}

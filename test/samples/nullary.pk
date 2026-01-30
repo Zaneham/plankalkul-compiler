@@ -1,0 +1,5 @@
+; Simple nullary plan for testing
+
+answer () => R0 {
+  42 => R0
+}

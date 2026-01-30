@@ -1,0 +1,6 @@
+; Maximum of two values using conditional
+; Expected output: 42
+max (V0, V1) => R0 {
+  V0 => R0
+  V1 > V0 -> { V1 => R0 }
+}

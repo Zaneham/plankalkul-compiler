@@ -1,0 +1,38 @@
+; Test: Intentional syntax errors for error message testing
+; This file contains syntax errors to test error reporting
+
+; Missing closing brace
+MissingBrace(V0[:i]) => R0[:i] {
+  V0 + 1 => R0
+
+
+; Missing arrow in assignment
+MissingArrow(V0[:i]) => R0[:i] {
+  V0 + 1 R0
+}
+
+; Invalid token
+InvalidToken(V0[:i]) => R0[:i] {
+  V0 @ 1 => R0
+}
+
+; Missing parenthesis
+MissingParen(V0[:i] => R0[:i] {
+  V0 => R0
+}
+
+; Invalid variable name
+InvalidVar(V0[:i]) => R0[:i] {
+  X0 => R0
+}
+
+; Unclosed block comment
+BlockComment(V0[:i]) => R0[:i] {
+  (* This comment never ends
+  V0 => R0
+}
+
+; Double operators
+DoubleOp(V0[:i]) => R0[:i] {
+  V0 ++ 1 => R0
+}

@@ -1,0 +1,26 @@
+; Test: FIN control flow
+; Tests break/goto semantics
+
+; Find first positive element, exit early with FIN
+FindPositive(V0[:8.i]) => R0[:i] {
+  0 => R0
+  W1(8) => Z0 {
+    V0[Z0] > 0 -> {
+      V0[Z0] => R0
+      FIN
+    }
+  }
+}
+
+; Nested loop with FIN - should exit all loops
+NestedSearch(V0[:i]) => R0[:i] {
+  0 => R0
+  W1(V0) => Z0 {
+    W1(V0) => Z1 {
+      Z0 = Z1 -> {
+        Z0 + Z1 => R0
+        FIN
+      }
+    }
+  }
+}

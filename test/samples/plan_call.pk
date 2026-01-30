@@ -1,0 +1,18 @@
+; Test: Plan calls - functions calling other functions
+; Tests the plan name resolution feature
+
+; Simple addition function
+Add(V0[:i], V1[:i]) => R0[:i] {
+  V0 + V1 => R0
+}
+
+; Double a number by calling Add
+Double(V0[:i]) => R0[:i] {
+  Add(V0, V0) => R0
+}
+
+; Triple by calling Add twice
+Triple(V0[:i]) => R0[:i] {
+  Add(V0, V0) => Z0
+  Add(Z0, V0) => R0
+}

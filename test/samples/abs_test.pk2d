@@ -1,0 +1,14 @@
+; Absolute value test
+; SOURCE: ZIA-0367, page 1
+
+ | Abs(V) => R
+V|     0      0
+K|
+S|     i      i
+
+ | |V| => R
+V|   0      0
+K|
+S|   i      i
+
+FIN

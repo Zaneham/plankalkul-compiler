@@ -1,0 +1,4 @@
+(library
+ (name codegen)
+ (public_name plankalkul.codegen)
+ (libraries ast typing))

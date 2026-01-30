@@ -1,0 +1,15 @@
+; Test file with multiple syntax errors
+
+; Error 1: Missing closing brace
+bad1 (V0) => R0 {
+  V0 + 1 => R0
+
+; Error 2: Invalid operator
+bad2 (V0) => R0 {
+  V0 @ 1 => R0
+}
+
+; This plan should still parse correctly
+good (V0) => R0 {
+  V0 + 2 => R0
+}
