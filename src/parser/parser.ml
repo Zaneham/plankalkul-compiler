@@ -741,19 +741,33 @@ and parse_comparison state =
   done;
   !left
 
-(** Parse logical: &, |, -> *)
-and parse_logical state =
+(** Parse logical AND: & (higher precedence than OR) *)
+and parse_and state =
   let left = ref (parse_comparison state) in
 
-  while check_any state [AND; OR; IMPL] do
+  while check state AND do
+    ignore (advance state);
+    let right = parse_comparison state in
+    left := {
+      expr_desc = EBinop (OpAnd, !left, right);
+      expr_typ = None;
+      expr_loc = merge_loc (!left).expr_loc right.expr_loc
+    }
+  done;
+  !left
+
+(** Parse logical OR and implication: |, -> (lower precedence than AND) *)
+and parse_logical state =
+  let left = ref (parse_and state) in
+
+  while check_any state [OR; IMPL] do
     let op_tok = advance state in
     let op = match op_tok.typ with
-      | AND -> OpAnd
       | OR -> OpOr
       | IMPL -> OpImpl
-      | _ -> OpAnd
+      | _ -> OpOr
     in
-    let right = parse_comparison state in
+    let right = parse_and state in
     left := {
       expr_desc = EBinop (op, !left, right);
       expr_typ = None;
