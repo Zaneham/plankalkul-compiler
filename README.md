@@ -190,7 +190,17 @@ And of course, **Konrad Zuse** himself — who, in the midst of the worst war in
 
 ## Related Projects
 
-- [Plankalkül IDE](https://github.com/Zaneham/plankalkul-ide) - VS Code extension with 2D grid editor
+### This Project
+- [Plankalkül IDE](https://github.com/Zaneham/plankalkul-ide) — VS Code extension with 2D grid editor and LSP
+
+### Historical Resources
+- [Konrad Zuse Internet Archive](https://zuse.zib.de) — Original manuscripts (ZIA-0367, ZIA-0368, ZIA-0410)
+- [Rojas et al. (2000)](http://www.zib.de/zuse/Inhalt/Programme/Plankalkuel/Plankalkuel-Report/Plankalkuel-Report.htm) — "Plankalkül: The First High-Level Programming Language and its Implementation"
+- [Bruines (2010)](https://www.cs.vu.nl/~dick/"; Bruines.pdf) — Formal semantics (bachelor thesis, VU Amsterdam)
+
+### Other Implementations
+- [Hovestar Plankalkül](http://www.hovestar.com/res/plankalkul/) — Reference implementation for linear notation
+- [FU Berlin Implementation](https://www.zib.de/zuse/Inhalt/Programme/Plankalkuel/) — The original 2000 implementation
 
 ## Licence
 
