@@ -18,7 +18,7 @@ The man designed a complete high-level programming language, with data structure
 
 Existing implementations handle the *linearised* notation rather well. However, Zuse's actual notation was **two-dimensional**, a sort of spreadsheet-meets-lambda-calculus affair that looks like ASCII art designed by a mathematician with strong opinions about vertical alignment.
 
-This compiler aims to handle both.
+This compiler aims to handle both :-) 
 
 ## Features
 
