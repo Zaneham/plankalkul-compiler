@@ -14,9 +14,9 @@ Written in **OCaml** — developed at INRIA, France — there's something rather
 
 Because Zuse deserved better.
 
-The man designed a complete high-level programming language — with data structures, user-defined types, assertions, nested scopes, and what we'd now recognise as functional programming features — whilst hiding from Allied bombs in rural Bavaria. The language wasn't implemented until 2000, when Prof. Raúl Rojas and his team at Freie Universität Berlin finally gave it life, 55 years after its design.
+The man designed a complete high-level programming language, with data structures, user-defined types, assertions, nested scopes, and what we'd now recognise as functional programming features, whilst hiding from Allied bombs in rural Bavaria. The language wasn't implemented until 2000, when Prof. Raúl Rojas and his team at Freie Universität Berlin finally gave it life, 55 years after its design.
 
-Existing implementations handle the *linearised* notation rather well. However, Zuse's actual notation was **two-dimensional** — a sort of spreadsheet-meets-lambda-calculus affair that looks like ASCII art designed by a mathematician with strong opinions about vertical alignment.
+Existing implementations handle the *linearised* notation rather well. However, Zuse's actual notation was **two-dimensional**, a sort of spreadsheet-meets-lambda-calculus affair that looks like ASCII art designed by a mathematician with strong opinions about vertical alignment.
 
 This compiler aims to handle both.
 
