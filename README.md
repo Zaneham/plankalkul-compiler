@@ -8,7 +8,6 @@
 
 This is a compiler for **Plankalkül** (German: "Plan Calculus"), the world's first high-level programming language, designed by Konrad Zuse between 1942 and 1945.
 
-Written in **OCaml** — developed at INRIA, France — there's something rather poetic about a French language breathing new life into a German one. Given the historical context of when Plankalkül was designed, one might call this a small act of computational reconciliation. Zuse would probably appreciate the irony; he was, after all, trying to build thinking machines whilst, at the time, his country was busy destroying things.
 
 ## Why Does This Exist?
 
