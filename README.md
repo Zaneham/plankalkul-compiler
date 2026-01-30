@@ -1,6 +1,6 @@
 # Plankalkül Compiler
 
-*A French programming language giving new life to a German one, 83 years late.*
+*The world's first high-level programming language, finally getting the tooling it deserves.*
 
 ---
 
@@ -8,6 +8,7 @@
 
 This is a compiler for **Plankalkül** (German: "Plan Calculus"), the world's first high-level programming language, designed by Konrad Zuse between 1942 and 1945.
 
+Written in OCaml. Compiles to C. Handles both Zuse's original 2D notation and the linearised format used by later implementations.
 
 ## Why Does This Exist?
 
