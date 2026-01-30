@@ -37,7 +37,7 @@ jobs:
           path: dist/plankalkul-linux-x64
 
   build-macos-intel:
-    runs-on: macos-13
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
