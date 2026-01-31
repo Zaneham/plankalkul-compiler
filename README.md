@@ -192,6 +192,7 @@ And of course, **Konrad Zuse** himself — who, in the midst of the worst war in
 
 ### This Project
 - [Plankalkül IDE](https://github.com/Zaneham/plankalkul-ide) — VS Code extension with 2D grid editor and LSP
+- [ppm](https://github.com/Zaneham/ppm) — Plankalkül Package Manager
 
 ### Historical Resources
 - [Konrad Zuse Internet Archive](https://zuse.zib.de) — Original manuscripts (ZIA-0367, ZIA-0368, ZIA-0410)
