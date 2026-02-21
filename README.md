@@ -1,9 +1,5 @@
 # Plankalkül Compiler
 
-*The world's first high-level programming language, finally getting the tooling it deserves.*
-
----
-
 ## What Is This?
 
 This is a compiler for **Plankalkül** (German: "Plan Calculus"), the world's first high-level programming language, designed by Konrad Zuse between 1942 and 1945.
