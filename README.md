@@ -4,7 +4,9 @@
 
 This is a compiler for **Plankalkül** (German: "Plan Calculus"), the world's first high-level programming language, designed by Konrad Zuse between 1942 and 1945.
 
-Written in OCaml. Compiles to C. Handles both Zuse's original 2D notation and the linearised format used by later implementations.
+You may notice that some of his manuscripts are dated to 1941, thats because he made several chess programs, in his language, before working on the full language. Which is pretty amazing when you really think about it.
+
+This compiler is written in OCaml. Compiles to C. Handles both Zuse's original 2D notation and the linearised format used by later implementations.
 
 ## Why Does This Exist?
 
@@ -130,7 +132,7 @@ plankalkul-compiler/
 
 ## Source Provenance
 
-This project takes historical accuracy seriously. Features are traced to their source documents:
+This project takes historical accuracy as seriously as possible. Features are traced to their source documents:
 
 - **Primary (1941-1945)**: Wartime manuscripts from the Zuse Internet Archive
 - **Secondary (1945-1949)**: Post-war formalisations
