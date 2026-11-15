@@ -1,18 +1,8 @@
-(** Plankalkül Compiler - Main Entry Point
-
-    "The calculus of plans" — Konrad Zuse, 1942
-
-    Usage: plankalkul [options] <file.pk>
-
-    83 years late, but we're here now.
-*)
-
 open Lexer.Tokens
 open Ast.Syntax
 open Errors.Error_types
 open Errors.Error_render
 
-(** Print usage information *)
 let usage () =
   print_endline "Plankalkül Compiler";
   print_endline "Usage: plankalkul [options] <file.pk>";
@@ -29,14 +19,12 @@ let usage () =
   print_endline "  .pk2d       2D notation";
   exit 0
 
-(** Print a token for debugging *)
 let print_token (tok : Lexer.Tokens.token) =
   Printf.printf "%3d:%-3d  %-20s  %s\n"
     tok.loc.line tok.loc.column
     (show_token_type tok.typ)
     tok.lexeme
 
-(** Simple AST printer - indented tree format *)
 let rec print_expr indent e =
   let pad = String.make indent ' ' in
   match e.expr_desc with
@@ -211,19 +199,16 @@ let print_program prog =
   Printf.printf "Plans: %d\n\n" (List.length prog.plans);
   List.iter print_plan prog.plans
 
-(** Read file contents *)
 let read_file filename =
-  let ic = open_in filename in
+  let ic = open_in_bin filename in
   let n = in_channel_length ic in
   let s = really_input_string ic n in
   close_in ic;
   s
 
-(** Main entry point *)
 let () =
   let args = Array.to_list Sys.argv |> List.tl in
 
-  (* Parse command line *)
   let rec parse_args mode files = function
     | [] -> (mode, List.rev files)
     | "--help" :: _ -> usage ()
@@ -245,12 +230,9 @@ let () =
     exit 1
   end;
 
-  (* Process each file *)
   List.iter (fun filename ->
-    (* Read source *)
     let source = read_file filename in
 
-    (* Detect notation type *)
     let is_2d = Filename.check_suffix filename ".pk2d" ||
                 Lexer.Lexer_2d.is_2d_notation source in
 
@@ -270,12 +252,10 @@ let () =
             (Lexer.Lexer_linear.tokenise lexer, None, None)
           end
         in
-        (* Show provenance if available *)
         (match prov_opt with
          | Some prov ->
            Printf.printf "Provenance: %s\n" (Provenance.Sources.cite prov)
          | None -> ());
-        (* Show alignment warnings for 2D notation *)
         (match warnings_opt with
          | Some warnings when String.length warnings > 0 ->
            Printf.eprintf "\n%s\n" warnings
@@ -284,14 +264,11 @@ let () =
 
     | `Parse ->
         Printf.printf "=== Parsing: %s ===\n" filename;
-        (* For now, 2D files get lexed then we'd need a 2D-aware parser
-           or convert tokens. Use linear parser for both. *)
         let tokens =
           if is_2d then begin
             Printf.printf "(2D notation detected - experimental)\n";
             let lexer = Lexer.Lexer_2d.create ~file:filename source in
             let toks = Lexer.Lexer_2d.tokenise lexer in
-            (* Show alignment warnings for 2D notation *)
             if Lexer.Lexer_2d.has_warnings lexer then begin
               let warnings = Lexer.Lexer_2d.format_warnings lexer in
               Printf.eprintf "\n%s\n" warnings
@@ -302,7 +279,6 @@ let () =
             Lexer.Lexer_linear.tokenise lexer
           end
         in
-        (* Create parser from tokens *)
         let state = Parser.create ~file:filename tokens in
         let prog = Parser.parse_program state in
         print_program prog
@@ -314,14 +290,12 @@ let () =
               Printf.eprintf "Note: 2D notation - experimental C generation\n%!";
               let lexer = Lexer.Lexer_2d.create ~file:filename source in
               let tokens = Lexer.Lexer_2d.tokenise lexer in
-              (* Show alignment warnings for 2D notation *)
               if Lexer.Lexer_2d.has_warnings lexer then begin
                 let warnings = Lexer.Lexer_2d.format_warnings lexer in
                 Printf.eprintf "\n%s\n" warnings
               end;
               let state = Parser.create ~file:filename tokens in
               let prog = Parser.parse_program state in
-              (* Check for collected parser errors *)
               if Parser.has_errors state then begin
                 let errors = Parser.get_errors state in
                 List.iter (fun (msg, loc) ->
@@ -337,7 +311,6 @@ let () =
               let state = Parser.create ~file:filename
                 (Lexer.Lexer_linear.tokenise_string ~file:filename source) in
               let prog = Parser.parse_program state in
-              (* Check for collected parser errors *)
               if Parser.has_errors state then begin
                 let errors = Parser.get_errors state in
                 List.iter (fun (msg, loc) ->
@@ -351,11 +324,9 @@ let () =
               prog
             end
           in
-          (* Resolve plan names, run type inference, then TYPE CHECK *)
           let prog = Typing.Resolve.resolve_program prog in
           let prog = Typing.Infer.infer_program prog in
 
-          (* Type checking - reject programs with type errors *)
           let type_errors = Typing.Check.check_program prog in
           if type_errors <> [] then begin
             prerr_endline "Type errors found:";
@@ -365,9 +336,9 @@ let () =
                 | None -> make_span filename 0 0 0 0
               in
               let code = match err.message with
-                | s when String.length s > 6 && String.sub s 0 6 = "Cannot" -> E100  (* Assignment mismatch *)
-                | s when String.length s > 12 && String.sub s 0 12 = "Incompatible" -> E101  (* Operation mismatch *)
-                | s when String.length s > 7 && String.sub s 0 7 = "Logical" -> E104  (* Non-boolean in logic *)
+                | s when String.length s > 6 && String.sub s 0 6 = "Cannot" -> E100
+                | s when String.length s > 12 && String.sub s 0 12 = "Incompatible" -> E101
+                | s when String.length s > 7 && String.sub s 0 7 = "Logical" -> E104
                 | _ -> E100
               in
               let err_obj = make_error code err.message span in
@@ -393,7 +364,6 @@ let () =
           if is_2d then begin
             let lexer = Lexer.Lexer_2d.create ~file:filename source in
             let tokens = Lexer.Lexer_2d.tokenise lexer in
-            (* Show alignment warnings for 2D notation *)
             if Lexer.Lexer_2d.has_warnings lexer then begin
               let warnings = Lexer.Lexer_2d.format_warnings lexer in
               Printf.eprintf "\n%s\n" warnings

@@ -1,5 +1,3 @@
-(** Parser Tests *)
-
 open Ast.Syntax
 
 let parse_program_str s =

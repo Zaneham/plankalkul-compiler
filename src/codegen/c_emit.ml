@@ -1,28 +1,14 @@
-(** C Code Emitter for Plankalkül
-
-    Translates the AST to C code.
-
-    Design decisions:
-    - Variables map to C variables with type prefixes (pk_v0, pk_z0, pk_r0)
-    - Bit arrays become uint8_t arrays with bit packing
-    - Plans become C functions
-    - Loops map to for/while loops
-
-    Attribution: Original compiler by Zane Hambly (2025-2026)
-*)
-
 open Ast.Syntax
 open Ast.Types
 
-(** Output buffer for generated code *)
 type emitter = {
   mutable indent: int;
-  mutable loop_depth: int;           (** Current loop nesting depth *)
-  mutable fin_label: string option;  (** Label for FIN to jump to *)
-  mutable allocations: string list;  (** Track malloc'd arrays for cleanup *)
-  mutable scope_depth: int;          (** Current scope nesting depth *)
-  mutable temp_counter: int;         (** Counter for temporary variables *)
-  mutable recursive_plans: (string, unit) Hashtbl.t;  (** Set of recursive plan names *)
+  mutable loop_depth: int;
+  mutable fin_label: string option;
+  mutable allocations: string list;
+  mutable scope_depth: int;
+  mutable temp_counter: int;
+  mutable recursive_plans: (string, unit) Hashtbl.t;
   buf: Buffer.t;
 }
 
@@ -50,52 +36,29 @@ let dedent e = e.indent <- max 0 (e.indent - 1)
 
 let contents e = Buffer.contents e.buf
 
-(** Maximum recursion depth before aborting.
+(* A modern addition, not part of Zuse's Plankalkül. *)
+let max_recursion_depth = 10000
 
-    MODERN ADDITION - NOT historically accurate to Plankalkül.
-
-    Zuse's Z3/Z4 machines had hardware-limited call depth (the relay
-    memory could only hold so many return addresses). This software
-    limit serves the same purpose on modern systems with deep stacks.
-
-    10,000 is generous—if your algorithm needs more, consider iteration. *)
-let max_recursion_depth = 10000  (* Matches PK_MAX_RECURSION_DEPTH in prelude *)
-
-(** Check if a plan is recursive *)
 let is_recursive e name =
   Hashtbl.mem e.recursive_plans name
 
-(** Generate a unique temporary variable name.
-
-    The underscore prefix signals "compiler-generated, do not touch"
-    in the universal language of C programmers. *)
 let fresh_temp e prefix =
   e.temp_counter <- e.temp_counter + 1;
   Printf.sprintf "_%s_%d" prefix e.temp_counter
 
-(** Track an allocation for later cleanup.
-
-    Memory management: the tax we pay for dynamic data structures.
-    Zuse's relay-based computers had no heap; we are not so fortunate. *)
 let track_alloc e varname =
   e.allocations <- varname :: e.allocations
 
-(** Emit cleanup code for all tracked allocations.
-
-    A responsible compiler cleans up after itself. We check for NULL
-    before freeing because double-free is a particularly unpleasant
-    species of undefined behaviour. *)
 let emit_cleanup e =
   List.iter (fun varname ->
     emit e (Printf.sprintf "if (%s.data) free(%s.data);" varname varname)
   ) e.allocations
 
-(** Map Plankalkül types to C types *)
 let c_type_of_typ t =
   match t with
-  | TPrimitive Bit -> "uint8_t"  (* Could be bool, but bit arrays need uint8_t *)
+  | TPrimitive Bit -> "uint8_t"
   | TPrimitive SignBit -> "int8_t"
-  | TPrimitive (BitWidth n) ->   (* S1.n - n-bit integer (historical) *)
+  | TPrimitive (BitWidth n) ->   (* S1.n, Zuse's n-bit integer *)
     if n <= 8 then "uint8_t"
     else if n <= 16 then "uint16_t"
     else if n <= 32 then "uint32_t"
@@ -105,14 +68,13 @@ let c_type_of_typ t =
   | TNumeric A10 -> "int64_t"    (* Signed integer *)
   | TNumeric A11 -> "double"     (* Positive fraction *)
   | TNumeric A12 -> "double"     (* Fraction *)
-  | TNumeric A13 -> "double _Complex"  (* Complex - C99 *)
-  | TArray (_, _) -> "pk_array_t"  (* Zuse's structural arrays: 2.i, 8.0, etc. *)
+  | TNumeric A13 -> "double _Complex"  (* Complex *)
+  | TArray (_, _) -> "pk_array_t"
   | TMultiArray (_, _) -> "pk_array_t"
   | TTuple _ -> "pk_tuple_t"
   | TUserDefined name -> Printf.sprintf "pk_%s_t" name
-  | TInferred -> "int64_t"  (* Default to int64 when type unknown *)
+  | TInferred -> "int64_t"
 
-(** Variable name in C *)
 let c_var_name v =
   let prefix = match v.kind with
     | VarV -> "pk_v"
@@ -120,23 +82,19 @@ let c_var_name v =
     | VarR -> "pk_r"
   in
   let base = Printf.sprintf "%s%d" prefix v.index in
-  (* Handle component access - Zuse's structural types *)
   match v.component with
   | None -> base
   | Some (IndexLiteral indices) ->
-    (* V0[0] -> pk_v0.data[0], V0[1][2] -> pk_v0.data[1].data[2] *)
     let access = List.fold_left (fun acc i ->
       Printf.sprintf "%s.data[%d]" acc i
     ) base indices in
     access
   | Some (IndexVar iv) ->
-    (* V0[Z1] -> pk_v0.data[pk_z1] - indirect access *)
     let idx_var = Printf.sprintf "pk_%s%d"
       (match iv.kind with VarV -> "v" | VarZ -> "z" | VarR -> "r")
       iv.index in
     Printf.sprintf "%s.data[%s]" base idx_var
   | Some (IndexMixed elements) ->
-    (* V0[Z0][Z1] or V0[2][Z1] - mixed literal and variable indices *)
     let access = List.fold_left (fun acc elem ->
       match elem with
       | IdxLit n -> Printf.sprintf "%s.data[%d]" acc n
@@ -148,7 +106,6 @@ let c_var_name v =
     ) base elements in
     access
 
-(** Emit a binary operator *)
 let c_binop = function
   | OpAdd -> "+"
   | OpSub -> "-"
@@ -162,29 +119,18 @@ let c_binop = function
   | OpGeq -> ">="
   | OpAnd -> "&&"
   | OpOr -> "||"
-  | OpImpl -> "||"  (* a -> b is !a || b, handled specially *)
-  | OpEquiv -> "=="  (* For booleans *)
+  | OpImpl -> "||"
+  | OpEquiv -> "=="
   | OpXor -> "^"
-  | OpIn -> "/* in */"  (* Needs runtime support *)
+  | OpIn -> "/* in */"
 
-(** Emit a unary operator *)
 let c_unop = function
   | OpNot -> "!"
   | OpNeg -> "-"
-  | OpAbs -> "llabs"  (* C stdlib absolute value for long long *)
+  | OpAbs -> "llabs"
 
-(** Constant folding for expressions.
-
-    The compiler's opportunity to feel clever: why emit "2 + 3" when we
-    can emit "5"? This optimisation dates back to the earliest compilers
-    and remains satisfying to implement.
-
-    We fold arithmetic, boolean operations, and comparisons on literals,
-    plus algebraic simplifications like x+0=x and x*1=x. The latter were
-    presumably obvious to Zuse, who had to count every relay. *)
 let rec fold_constants expr =
   match expr.expr_desc with
-  (* Fold binary operations on literals *)
   | EBinop (OpAdd, {expr_desc=ELit(LitInt a); _}, {expr_desc=ELit(LitInt b); _}) ->
       { expr with expr_desc = ELit (LitInt (a + b)) }
   | EBinop (OpSub, {expr_desc=ELit(LitInt a); _}, {expr_desc=ELit(LitInt b); _}) ->
@@ -194,7 +140,6 @@ let rec fold_constants expr =
   | EBinop (OpDiv, {expr_desc=ELit(LitInt a); _}, {expr_desc=ELit(LitInt b); _}) when b <> 0 ->
       { expr with expr_desc = ELit (LitInt (a / b)) }
 
-  (* Fold floating point operations *)
   | EBinop (OpAdd, {expr_desc=ELit(LitFloat a); _}, {expr_desc=ELit(LitFloat b); _}) ->
       { expr with expr_desc = ELit (LitFloat (a +. b)) }
   | EBinop (OpSub, {expr_desc=ELit(LitFloat a); _}, {expr_desc=ELit(LitFloat b); _}) ->
@@ -204,13 +149,11 @@ let rec fold_constants expr =
   | EBinop (OpDiv, {expr_desc=ELit(LitFloat a); _}, {expr_desc=ELit(LitFloat b); _}) when b <> 0.0 ->
       { expr with expr_desc = ELit (LitFloat (a /. b)) }
 
-  (* Fold boolean operations *)
   | EBinop (OpAnd, {expr_desc=ELit(LitBit a); _}, {expr_desc=ELit(LitBit b); _}) ->
       { expr with expr_desc = ELit (LitBit (a && b)) }
   | EBinop (OpOr, {expr_desc=ELit(LitBit a); _}, {expr_desc=ELit(LitBit b); _}) ->
       { expr with expr_desc = ELit (LitBit (a || b)) }
 
-  (* Fold comparisons *)
   | EBinop (OpEq, {expr_desc=ELit(LitInt a); _}, {expr_desc=ELit(LitInt b); _}) ->
       { expr with expr_desc = ELit (LitBit (a = b)) }
   | EBinop (OpNeq, {expr_desc=ELit(LitInt a); _}, {expr_desc=ELit(LitInt b); _}) ->
@@ -224,7 +167,6 @@ let rec fold_constants expr =
   | EBinop (OpGeq, {expr_desc=ELit(LitInt a); _}, {expr_desc=ELit(LitInt b); _}) ->
       { expr with expr_desc = ELit (LitBit (a >= b)) }
 
-  (* Fold unary operations *)
   | EUnop (OpNeg, {expr_desc=ELit(LitInt n); _}) ->
       { expr with expr_desc = ELit (LitInt (-n)) }
   | EUnop (OpNeg, {expr_desc=ELit(LitFloat f); _}) ->
@@ -234,7 +176,6 @@ let rec fold_constants expr =
   | EUnop (OpAbs, {expr_desc=ELit(LitInt n); _}) ->
       { expr with expr_desc = ELit (LitInt (abs n)) }
 
-  (* Algebraic simplifications *)
   | EBinop (OpAdd, e, {expr_desc=ELit(LitInt 0); _})
   | EBinop (OpAdd, {expr_desc=ELit(LitInt 0); _}, e) -> fold_constants e
   | EBinop (OpSub, e, {expr_desc=ELit(LitInt 0); _}) -> fold_constants e
@@ -245,7 +186,6 @@ let rec fold_constants expr =
   | EBinop (OpMul, {expr_desc=ELit(LitInt 1); _}, e) -> fold_constants e
   | EBinop (OpDiv, e, {expr_desc=ELit(LitInt 1); _}) -> fold_constants e
 
-  (* Short-circuit boolean simplifications *)
   | EBinop (OpAnd, {expr_desc=ELit(LitBit false); _}, _)
   | EBinop (OpAnd, _, {expr_desc=ELit(LitBit false); _}) ->
       { expr with expr_desc = ELit (LitBit false) }
@@ -257,7 +197,6 @@ let rec fold_constants expr =
   | EBinop (OpOr, {expr_desc=ELit(LitBit false); _}, e)
   | EBinop (OpOr, e, {expr_desc=ELit(LitBit false); _}) -> fold_constants e
 
-  (* Recursively fold in binary operations *)
   | EBinop (op, l, r) ->
       let l' = fold_constants l in
       let r' = fold_constants r in
@@ -265,7 +204,6 @@ let rec fold_constants expr =
         fold_constants { expr with expr_desc = EBinop (op, l', r') }
       else expr
 
-  (* Recursively fold in unary operations *)
   | EUnop (op, e) ->
       let e' = fold_constants e in
       if e' != e then
@@ -274,13 +212,11 @@ let rec fold_constants expr =
 
   | _ -> expr
 
-(** Emit an expression, returning the C code as a string *)
 let rec emit_expr expr =
-  (* Apply constant folding first *)
   let expr = fold_constants expr in
   match expr with
   | { expr_desc = ELit (LitInt n); _ } ->
-      Printf.sprintf "%dLL" n  (* LL for int64_t *)
+      Printf.sprintf "%dLL" n
   | { expr_desc = ELit (LitFloat f); _ } ->
       Printf.sprintf "%f" f
   | { expr_desc = ELit (LitBit true); _ } ->
@@ -288,7 +224,6 @@ let rec emit_expr expr =
   | { expr_desc = ELit (LitBit false); _ } ->
       "0"
   | { expr_desc = ELit (LitArray elems); _ } ->
-      (* C99 compound literal for array *)
       let emit_lit = function
         | LitInt n -> Printf.sprintf "%dLL" n
         | LitFloat f -> Printf.sprintf "%f" f
@@ -301,7 +236,6 @@ let rec emit_expr expr =
       Printf.sprintf "(pk_array_t){ .len = %d, .data = (int64_t[]){%s} }"
         (List.length elems) elems_str
   | { expr_desc = ELit (LitTuple elems); _ } ->
-      (* C99 compound literal for tuple *)
       let emit_lit = function
         | LitInt n -> Printf.sprintf "%dLL" n
         | LitFloat f -> Printf.sprintf "%f" f
@@ -317,7 +251,6 @@ let rec emit_expr expr =
   | { expr_desc = EVar v; _ } ->
       c_var_name v
   | { expr_desc = EBinop (OpImpl, l, r); _ } ->
-      (* a -> b becomes !a || b *)
       Printf.sprintf "(!(%s) || (%s))" (emit_expr l) (emit_expr r)
   | { expr_desc = EBinop (op, l, r); _ } ->
       Printf.sprintf "(%s %s %s)" (emit_expr l) (c_binop op) (emit_expr r)
@@ -333,18 +266,16 @@ let rec emit_expr expr =
   | { expr_desc = ECardinality e; _ } ->
       Printf.sprintf "pk_len(%s)" (emit_expr e)
   | { expr_desc = EFindUnique (v, range, pred); _ } ->
-      (* ´x(x ∈ L ∧ P(x)) - first x satisfying predicate *)
+      (* ´x(x ∈ L ∧ P(x)) is the first x in L satisfying P. *)
       let range_str = emit_expr range in
       let var_name = c_var_name v in
       Printf.sprintf "({ int64_t _r = 0; pk_array_t _src = %s; for (size_t _i = 0; _i < _src.len; _i++) { int64_t %s = _src.data[_i]; if (%s) { _r = %s; break; } } _r; })"
         range_str var_name (emit_expr pred) var_name
   | { expr_desc = EFilterSet (v, range, pred); _ }
   | { expr_desc = EFilterSeq (v, range, pred); _ } ->
-      (* ˆx(x ∈ L ∧ P(x)) - filter elements satisfying predicate *)
-      (* Use safe allocation: alloca for small arrays, malloc for large ones *)
+      (* ˆx(x ∈ L ∧ P(x)) keeps the elements of L satisfying P. *)
       let range_str = emit_expr range in
       let var_name = c_var_name v in
-      (* MODERN ADDITION: VLA safety - use alloca for small arrays, malloc for large *)
       Printf.sprintf "({ /* MODERN: VLA safety */ pk_array_t _src = %s; \
         int64_t* _pred = _src.len <= PK_VLA_STACK_LIMIT \
           ? (int64_t*)alloca(_src.len * sizeof(int64_t)) \
@@ -358,53 +289,40 @@ let rec emit_expr expr =
         _result; })"
         range_str var_name (emit_expr pred)
   | { expr_desc = EForall (v, range, pred); _ } ->
-      (* ∀x(x ∈ L ⇒ P(x)) - true if all elements satisfy predicate *)
-      (* Uses GCC statement expression for inline evaluation *)
+      (* ∀x(x ∈ L ⇒ P(x)) holds when every element satisfies P. *)
       let range_str = emit_expr range in
       let var_name = c_var_name v in
       Printf.sprintf "({ uint8_t _r = 1; pk_array_t _src = %s; for (size_t _i = 0; _i < _src.len; _i++) { int64_t %s = _src.data[_i]; if (!(%s)) { _r = 0; break; } } _r; })"
         range_str var_name (emit_expr pred)
   | { expr_desc = EExists (v, range, pred); _ } ->
-      (* ∃x(x ∈ L ∧ P(x)) - true if any element satisfies predicate *)
+      (* ∃x(x ∈ L ∧ P(x)) holds when some element satisfies P. *)
       let range_str = emit_expr range in
       let var_name = c_var_name v in
       Printf.sprintf "({ uint8_t _r = 0; pk_array_t _src = %s; for (size_t _i = 0; _i < _src.len; _i++) { int64_t %s = _src.data[_i]; if (%s) { _r = 1; break; } } _r; })"
         range_str var_name (emit_expr pred)
   | { expr_desc = EMu (v, range, pred); _ } ->
-      (* µx - forward iterator, find first satisfying element *)
-      (* Note: Full stateful iteration requires loop context; this is find-first semantics *)
+      (* µx is Zuse's forward iterator, reduced here to find-first since full iteration needs loop context. *)
       let range_str = emit_expr range in
       let var_name = c_var_name v in
       Printf.sprintf "({ int64_t _r = 0; pk_array_t _src = %s; for (size_t _i = 0; _i < _src.len; _i++) { int64_t %s = _src.data[_i]; if (%s) { _r = %s; break; } } _r; })"
         range_str var_name (emit_expr pred) var_name
   | { expr_desc = ELambda (v, range, pred); _ } ->
-      (* λx - backward iterator, find last satisfying element *)
-      (* Note: Full stateful iteration requires loop context; this is find-last semantics *)
+      (* λx is Zuse's backward iterator, reduced here to find-last since full iteration needs loop context. *)
       let range_str = emit_expr range in
       let var_name = c_var_name v in
       Printf.sprintf "({ int64_t _r = 0; pk_array_t _src = %s; for (size_t _i = _src.len; _i > 0; _i--) { int64_t %s = _src.data[_i - 1]; if (%s) { _r = %s; break; } } _r; })"
         range_str var_name (emit_expr pred) var_name
 
-(** Dead code elimination: check if statement is unreachable or no-op.
-
-    Code that cannot execute need not be generated. This includes:
-    - Conditionals guarded by constant false (optimistic programming)
-    - Code after unconditional FIN (the compiler equivalent of
-      "I stopped reading after 'regards'")
-    - Empty blocks (the sound of one hand clapping) *)
 let rec is_dead_statement stmt =
   match stmt.stmt_desc with
   | SEmpty -> true
   | SBlock [] -> true
   | SSequence [] -> true
-  (* Conditional with false constant is dead *)
   | SConditional ({expr_desc = ELit (LitBit false); _}, _) -> true
-  (* Block/sequence where all statements are dead *)
   | SBlock stmts | SSequence stmts ->
       List.for_all is_dead_statement stmts
   | _ -> false
 
-(** Check if a statement unconditionally terminates (FIN) *)
 let rec always_terminates stmt =
   match stmt.stmt_desc with
   | SFin -> true
@@ -414,26 +332,21 @@ let rec always_terminates stmt =
       always_terminates body
   | _ -> false
 
-(** Remove dead code after unconditional FIN *)
 let rec eliminate_dead_code stmts =
   match stmts with
   | [] -> []
   | stmt :: rest ->
       if always_terminates stmt then
-        [stmt]  (* Drop everything after unconditional FIN *)
+        [stmt]
       else
         stmt :: eliminate_dead_code rest
 
-(** Optimize a statement (dead code elimination) *)
 let rec optimize_stmt stmt =
   match stmt.stmt_desc with
-  (* false -> S becomes empty *)
   | SConditional ({expr_desc = ELit (LitBit false); _}, _) ->
       { stmt with stmt_desc = SEmpty }
-  (* true -> S becomes just S *)
   | SConditional ({expr_desc = ELit (LitBit true); _}, body) ->
       optimize_stmt body
-  (* Optimize block/sequence *)
   | SBlock stmts ->
       let stmts' = List.map optimize_stmt stmts in
       let stmts' = List.filter (fun s -> not (is_dead_statement s)) stmts' in
@@ -444,18 +357,16 @@ let rec optimize_stmt stmt =
       let stmts' = List.filter (fun s -> not (is_dead_statement s)) stmts' in
       let stmts' = eliminate_dead_code stmts' in
       { stmt with stmt_desc = SSequence stmts' }
-  (* Optimize loop bodies *)
   | SLoopW branches ->
       let branches' = List.filter_map (fun b ->
         let cond = fold_constants b.cond in
         match cond.expr_desc with
-        | ELit (LitBit false) -> None  (* Remove always-false branches *)
+        | ELit (LitBit false) -> None
         | _ -> Some { cond; body = optimize_stmt b.body }
       ) branches in
       { stmt with stmt_desc = SLoopW branches' }
   | SLoopW0 (count, body) ->
       let count = fold_constants count in
-      (* W0(0) { S } - never executes *)
       (match count.expr_desc with
        | ELit (LitInt 0) -> { stmt with stmt_desc = SEmpty }
        | _ -> { stmt with stmt_desc = SLoopW0 (count, optimize_stmt body) })
@@ -473,9 +384,7 @@ let rec optimize_stmt stmt =
       { stmt with stmt_desc = SConditional (fold_constants cond, optimize_stmt body) }
   | _ -> stmt
 
-(** Emit a statement *)
 let rec emit_stmt e stmt =
-  (* Apply optimizations first *)
   let stmt = optimize_stmt stmt in
   match stmt.stmt_desc with
   | SEmpty -> ()
@@ -494,9 +403,7 @@ let rec emit_stmt e stmt =
       List.iter (emit_stmt e) stmts
 
   | SLoopW branches ->
-      (* W loop: repeat conditional branches until all false or Fin
-         Historical: Zuse's conditional loop - each branch is b→S
-         Loop continues while ANY condition is true *)
+      (* Zuse's W repeats its b→S branches while any condition holds, or until Fin. *)
       emit e "/* W loop - Zuse's conditional branches */";
       e.loop_depth <- e.loop_depth + 1;
       emit e "while (1) {";
@@ -516,7 +423,7 @@ let rec emit_stmt e stmt =
       e.loop_depth <- e.loop_depth - 1
 
   | SLoopW0 (count, body) ->
-      (* W0: repeat n times, counter hidden *)
+      (* W0 repeats n times with a hidden counter. *)
       e.loop_depth <- e.loop_depth + 1;
       emit e (Printf.sprintf "for (int64_t _pk_i = 0; _pk_i < %s; _pk_i++) {"
                (emit_expr count));
@@ -527,7 +434,7 @@ let rec emit_stmt e stmt =
       e.loop_depth <- e.loop_depth - 1
 
   | SLoopW1 (count, iter, body) ->
-      (* W1: count up from 0 to n-1 *)
+      (* W1 counts up from 0 to n-1. *)
       e.loop_depth <- e.loop_depth + 1;
       emit e (Printf.sprintf "for (int64_t %s = 0; %s < %s; %s++) {"
                (c_var_name iter) (c_var_name iter)
@@ -539,7 +446,7 @@ let rec emit_stmt e stmt =
       e.loop_depth <- e.loop_depth - 1
 
   | SLoopW2 (count, iter, body) ->
-      (* W2: count down from n-1 to 0 *)
+      (* W2 counts down from n-1 to 0. *)
       e.loop_depth <- e.loop_depth + 1;
       emit e (Printf.sprintf "for (int64_t %s = %s - 1; %s >= 0; %s--) {"
                (c_var_name iter) (emit_expr count)
@@ -551,7 +458,7 @@ let rec emit_stmt e stmt =
       e.loop_depth <- e.loop_depth - 1
 
   | SLoopW3 (n, m, iter, body) ->
-      (* W3: while m >= n *)
+      (* W3 repeats while m >= n. *)
       e.loop_depth <- e.loop_depth + 1;
       emit e (Printf.sprintf "for (int64_t %s = %s; %s >= %s; %s--) {"
                (c_var_name iter) (emit_expr m)
@@ -563,7 +470,7 @@ let rec emit_stmt e stmt =
       e.loop_depth <- e.loop_depth - 1
 
   | SLoopW4 (n, m, iter, body) ->
-      (* W4: while m <= n *)
+      (* W4 repeats while m <= n. *)
       e.loop_depth <- e.loop_depth + 1;
       emit e (Printf.sprintf "for (int64_t %s = %s; %s <= %s; %s++) {"
                (c_var_name iter) (emit_expr m)
@@ -575,7 +482,7 @@ let rec emit_stmt e stmt =
       e.loop_depth <- e.loop_depth - 1
 
   | SLoopW5 (n, m, iter, body) ->
-      (* W5: toward target, auto-direction *)
+      (* W5 steps towards the target in whichever direction it lies. *)
       e.loop_depth <- e.loop_depth + 1;
       emit e "/* W5 loop - toward target */";
       emit e (Printf.sprintf "{");
@@ -596,7 +503,7 @@ let rec emit_stmt e stmt =
       e.loop_depth <- e.loop_depth - 1
 
   | SLoopW6 (list_expr, elem, body) ->
-      (* W6: iterate list until empty *)
+      (* W6 iterates over a list until it is empty. *)
       e.loop_depth <- e.loop_depth + 1;
       emit e "/* W6 loop - list iteration (Bruines p.12) */";
       emit e (Printf.sprintf "for (size_t _pk_idx = 0; _pk_idx < pk_len(%s); _pk_idx++) {"
@@ -610,23 +517,19 @@ let rec emit_stmt e stmt =
       e.loop_depth <- e.loop_depth - 1
 
   | SFin ->
-      (* FIN: Use goto for function-level exit, break for single loop *)
       (match e.fin_label with
        | Some label -> emit e (Printf.sprintf "goto %s;  /* Fin */" label)
        | None ->
          if e.loop_depth > 1 then
-           (* Nested loop - need goto to exit all loops *)
            emit e "goto _pk_fin;  /* Fin - nested */"
          else
            emit e "break;  /* Fin */")
 
-(** Get C type for a variable, using its type annotation if present *)
 let c_type_of_var v =
   match v.typ with
   | Some t -> c_type_of_typ t
   | None -> "int64_t"
 
-(** Collect all variables used in a statement *)
 let rec collect_vars_stmt acc stmt =
   match stmt.stmt_desc with
   | SEmpty | SFin -> acc
@@ -680,18 +583,14 @@ and collect_vars_expr acc expr =
     let acc = collect_vars_expr acc e in
     collect_vars_expr acc p
 
-(** Emit typed local variable declarations, using signature types for R vars *)
 let emit_typed_locals e (sig_outputs : var list) body =
   let vars = collect_vars_stmt [] body in
-  (* Deduplicate by (kind, index), preferring typed versions *)
   let tbl = Hashtbl.create 16 in
 
-  (* First, add output variables from signature with their declared types *)
   List.iter (fun (v : var) ->
     Hashtbl.replace tbl (v.kind, v.index) v.typ
   ) sig_outputs;
 
-  (* Then add Z variables from body (R vars already have signature types) *)
   List.iter (fun (kind, idx, typ) ->
     let key = (kind, idx) in
     if kind = VarZ then begin
@@ -704,7 +603,6 @@ let emit_typed_locals e (sig_outputs : var list) body =
     end
   ) vars;
 
-  (* Group by type *)
   let by_type = Hashtbl.create 8 in
   Hashtbl.iter (fun (kind, idx) typ ->
     let c_typ = match typ with
@@ -719,12 +617,10 @@ let emit_typed_locals e (sig_outputs : var list) body =
     in
     Hashtbl.replace by_type c_typ names
   ) tbl;
-  (* Emit declarations grouped by type *)
   if Hashtbl.length by_type > 0 then begin
     emit e "/* Local variables */";
     Hashtbl.iter (fun c_typ names ->
       let sorted = List.sort String.compare names in
-      (* Use appropriate zero initializer for structured types *)
       let init_val =
         if c_typ = "double" || c_typ = "double _Complex" then "0.0"
         else if c_typ = "pk_array_t" then "{ 0 }"
@@ -737,9 +633,7 @@ let emit_typed_locals e (sig_outputs : var list) body =
     emit e ""
   end
 
-(** Emit a plan as a C function *)
 let emit_plan e (plan : plan) =
-  (* Determine return type from output variable types *)
   let num_outputs = List.length plan.signature.outputs in
   let ret_type = match num_outputs with
     | 0 -> "void"
@@ -747,16 +641,14 @@ let emit_plan e (plan : plan) =
     | 2 -> "pk_result2_t"
     | 3 -> "pk_result3_t"
     | 4 -> "pk_result4_t"
-    | _ -> "pk_result4_t"  (* Cap at 4 for now *)
+    | _ -> "pk_result4_t"
   in
 
-  (* Function name *)
   let name = match plan.plan_name with
     | Some n -> Printf.sprintf "pk_%s" n
     | None -> Printf.sprintf "pk_plan_%d" plan.plan_ref.plan_number
   in
 
-  (* Parameters with proper types *)
   let params = List.map (fun v ->
     Printf.sprintf "%s %s" (c_type_of_var v) (c_var_name v)
   ) plan.signature.inputs in
@@ -765,13 +657,10 @@ let emit_plan e (plan : plan) =
     | _ -> String.concat ", " params
   in
 
-  (* Check if this plan is recursive *)
   let plan_name_str = match plan.plan_name with Some n -> n | None -> "" in
   let is_recursive_plan = is_recursive e plan_name_str in
 
-  (* Function signature with provenance *)
   emit e "";
-  (* Add provenance comment for Delta/Greek-prefix plans *)
   let prefix_comment = match plan.plan_ref.plan_prefix with
     | Some GroupDelta ->
         Printf.sprintf "/* Plan: %s\n   Source: ZIA-0410 (1942) - Delta notation for chess plans\n   PΔ%d in Zuse's original notation */"
@@ -791,9 +680,6 @@ let emit_plan e (plan : plan) =
   in
   emit e prefix_comment;
 
-  (* MODERN ADDITION: For recursive plans, emit thread-local depth counter
-     to prevent stack overflow. Not historically accurate - Zuse's machines
-     had hardware-limited call depth. *)
   if is_recursive_plan then begin
     emit e "/* MODERN ADDITION: Recursion depth tracking (not in original Plankalkül) */";
     emit e (Printf.sprintf "static _Thread_local int _pk_depth_%s = 0;" name)
@@ -802,7 +688,6 @@ let emit_plan e (plan : plan) =
   emit e (Printf.sprintf "%s %s(%s) {" ret_type name params_str);
   indent e;
 
-  (* For recursive plans, add depth check at entry *)
   if is_recursive_plan then begin
     emit e "/* MODERN: Stack overflow protection */";
     emit e (Printf.sprintf "if (++_pk_depth_%s > PK_MAX_RECURSION_DEPTH) {" name);
@@ -813,42 +698,34 @@ let emit_plan e (plan : plan) =
     emit e "}"
   end;
 
-  (* Emit typed local variables - use signature types for R vars *)
   emit_typed_locals e plan.signature.outputs plan.body;
 
-  (* Reset tracking for this plan *)
   e.loop_depth <- 0;
   e.fin_label <- None;
   e.allocations <- [];
   e.scope_depth <- 0;
   e.temp_counter <- 0;
 
-  (* Body *)
   emit_stmt e plan.body;
 
-  (* Label for FIN to jump to when escaping nested loops *)
   emit e "";
   emit e "_pk_fin:;  /* FIN target label */";
 
-  (* Emit cleanup code for tracked allocations *)
   if e.allocations <> [] then begin
     emit e "";
     emit e "/* Memory cleanup */";
     emit_cleanup e
   end;
 
-  (* For recursive plans, decrement depth counter before return *)
   if is_recursive_plan then begin
     emit e (Printf.sprintf "--_pk_depth_%s;" name)
   end;
 
-  (* Return *)
   (match plan.signature.outputs with
    | [] -> ()
    | [r] -> emit e (Printf.sprintf "return %s;" (c_var_name r))
    | outputs ->
-       (* Multiple return values: construct struct literal
-          Historical: Zuse's functions could return tuples like (R0, R1) *)
+       (* Zuse's plans can return tuples such as (R0, R1). *)
        let fields = List.mapi (fun i r ->
          Printf.sprintf ".r%d = %s" i (c_var_name r)
        ) outputs in
@@ -862,7 +739,6 @@ let emit_plan e (plan : plan) =
   dedent e;
   emit e "}"
 
-(** Emit the runtime header include and helpers *)
 let emit_prelude e =
   emit e "/* ============================================================================";
   emit e "   Generated by Plankalkül Compiler";
@@ -894,7 +770,7 @@ let emit_prelude e =
   emit e "#include <stdint.h>";
   emit e "#include <stdbool.h>";
   emit e "#include <stdio.h>";
-  emit e "#include <stdlib.h>";  (* For llabs, malloc, free *)
+  emit e "#include <stdlib.h>";
   emit e "";
   emit e "/* Platform-specific alloca - MODERN ADDITION for VLA safety */";
   emit e "#ifdef _WIN32";
@@ -942,24 +818,6 @@ let emit_prelude e =
   emit e "}";
   emit e ""
 
-(** Emit a truth table as a C lookup function.
-
-    Truth tables (Zuse's decision tables from ZIA-0368) become
-    lookup functions that evaluate all inputs and return outputs.
-    These are essentially compile-time evaluated decision tables.
-
-    Example:
-      TABLE foo { a b | F1 F2
-                  - - | +  +
-                  + - | -  + }
-
-    Becomes:
-      static inline int64_t pk_table_foo(int64_t a, int64_t b, int output) {
-        if (!a && !b) return output == 0 ? 1 : 1;
-        if (a && !b) return output == 0 ? 0 : 1;
-        return 0;
-      }
-*)
 let emit_truth_table e (table : truth_table) =
   let name = match table.table_name with
     | Some n -> n
@@ -967,22 +825,18 @@ let emit_truth_table e (table : truth_table) =
   in
   let num_outputs = List.length table.table_outputs in
 
-  (* Function signature: inputs as int64_t, output index selector *)
   let params = String.concat ", "
     (List.map (fun input -> Printf.sprintf "int64_t %s" input) table.table_inputs @
      ["int _output_idx"]) in
   emit e (Printf.sprintf "static inline int64_t pk_table_%s(%s) {" name params);
   indent e;
 
-  (* Generate if-chain for each row *)
   List.iter (fun row ->
-    (* Build condition: conjunction of input tests *)
     let conds = List.map2 (fun input_name input_val ->
       if input_val then input_name else Printf.sprintf "!%s" input_name
     ) table.table_inputs row.row_inputs in
     let cond_str = String.concat " && " conds in
 
-    (* Build output selection *)
     let output_cases = List.mapi (fun i output_val ->
       Printf.sprintf "_output_idx == %d ? %dLL" i (if output_val then 1 else 0)
     ) row.row_outputs in
@@ -1002,23 +856,10 @@ let emit_truth_table e (table : truth_table) =
   emit e "}";
   emit e ""
 
-(** Check if a type is a simple scalar (can be passed as CLI arg) *)
 let is_simple_type = function
   | TPrimitive _ | TNumeric _ | TInferred -> true
   | TArray _ | TMultiArray _ | TTuple _ | TUserDefined _ -> false
 
-(** Emit main function wrapper.
-
-    Generates a main() that accepts command-line arguments and passes them
-    to the first plan. This enables integration testing:
-
-      ./program 3 4    # Calls pk_add(3, 4) if add takes 2 inputs
-
-    Handles various input/output types:
-    - Simple scalars: Parse as int64_t from CLI args
-    - Arrays: Build from multiple CLI args (first arg is length)
-    - Tuples: Build from consecutive CLI args
-    - Multi-return: Print all tuple members *)
 let emit_main e (plan : plan option) =
   emit e "";
   emit e "int main(int argc, char* argv[]) {";
@@ -1029,12 +870,10 @@ let emit_main e (plan : plan option) =
        let inputs = p.signature.inputs in
        let outputs = p.signature.outputs in
 
-       (* Check input types *)
        let has_complex_inputs = List.exists (fun v ->
          match v.typ with Some t -> not (is_simple_type t) | None -> false
        ) inputs in
 
-       (* Check if output is complex (tuple, array, or multiple outputs) *)
        let is_multi_return =
          List.length outputs > 1 ||
          (List.length outputs = 1 &&
@@ -1042,7 +881,6 @@ let emit_main e (plan : plan option) =
           | Some (TTuple _) -> true
           | _ -> false) in
 
-       (* Check if output is an array *)
        let is_array_return =
          List.length outputs = 1 &&
          match (List.hd outputs).typ with
@@ -1050,7 +888,6 @@ let emit_main e (plan : plan option) =
          | _ -> false in
 
        if List.length inputs = 0 then begin
-         (* No inputs *)
          if is_array_return then begin
            emit e (Printf.sprintf "pk_array_t result = pk_%s();" name);
            emit e "printf(\"Array[%%zu]: \", result.len);";
@@ -1066,7 +903,6 @@ let emit_main e (plan : plan option) =
              | _ -> Printf.sprintf "pk_result%d_t" (List.length outputs)
            in
            emit e (Printf.sprintf "%s result = pk_%s();" out_type name);
-           (* Print each member *)
            let num_outputs = match outputs with
              | [o] -> (match o.typ with Some (TTuple ts) -> List.length ts | _ -> 1)
              | _ -> List.length outputs
@@ -1079,14 +915,12 @@ let emit_main e (plan : plan option) =
            emit e "printf(\"Result: %lld\\n\", (long long)result);"
          end
        end else if has_complex_inputs then begin
-         (* Complex inputs - generate array/tuple construction *)
          emit e "/* Parse command-line arguments for complex types */";
          emit e "int arg_idx = 1;";
          List.iteri (fun i v ->
            let arg_name = Printf.sprintf "arg%d" i in
            match v.typ with
            | Some (TArray (_, _)) | Some (TMultiArray (_, _)) ->
-             (* Array: first CLI arg is length, then elements *)
              emit e (Printf.sprintf "/* Array input %d */" i);
              emit e (Printf.sprintf "int64_t %s_len = (arg_idx < argc) ? atoll(argv[arg_idx++]) : 0LL;" arg_name);
              emit e (Printf.sprintf "int64_t* %s_data = malloc(%s_len * sizeof(int64_t));" arg_name arg_name);
@@ -1097,7 +931,6 @@ let emit_main e (plan : plan option) =
              emit e "}";
              emit e (Printf.sprintf "pk_array_t %s = { .len = %s_len, .data = %s_data };" arg_name arg_name arg_name)
            | Some (TTuple ts) ->
-             (* Tuple: consecutive CLI args for each member *)
              let n = List.length ts in
              emit e (Printf.sprintf "/* Tuple input %d (%d members) */" i n);
              emit e (Printf.sprintf "pk_tuple_t %s = {" arg_name);
@@ -1109,7 +942,6 @@ let emit_main e (plan : plan option) =
              dedent e;
              emit e "};"
            | _ ->
-             (* Simple type *)
              emit e (Printf.sprintf "int64_t %s = (arg_idx < argc) ? atoll(argv[arg_idx++]) : 0LL;" arg_name)
          ) inputs;
          let args = String.concat ", " (List.mapi (fun i _ -> Printf.sprintf "arg%d" i) inputs) in
@@ -1139,7 +971,6 @@ let emit_main e (plan : plan option) =
            emit e (Printf.sprintf "int64_t result = pk_%s(%s);" name args);
            emit e "printf(\"Result: %lld\\n\", (long long)result);"
          end;
-         (* Cleanup arrays *)
          List.iteri (fun i v ->
            match v.typ with
            | Some (TArray _) | Some (TMultiArray _) ->
@@ -1147,7 +978,6 @@ let emit_main e (plan : plan option) =
            | _ -> ()
          ) inputs
        end else begin
-         (* Simple inputs - parse as int64_t *)
          emit e "/* Parse command-line arguments */";
          List.iteri (fun i _ ->
            emit e (Printf.sprintf "int64_t arg%d = (argc > %d) ? atoll(argv[%d]) : 0LL;"
@@ -1187,16 +1017,13 @@ let emit_main e (plan : plan option) =
   dedent e;
   emit e "}"
 
-(** Emit a complete program *)
 let emit_program prog =
   let e = create () in
 
-  (* Analyze for recursive plans *)
   e.recursive_plans <- Typing.Recursion.analyze prog;
 
   emit_prelude e;
 
-  (* Emit truth tables first (they may be called by plans) *)
   if prog.truth_tables <> [] then begin
     emit e "/* ============================================================================";
     emit e "   Truth Tables (Wahrheitstafeln)";
@@ -1212,10 +1039,8 @@ let emit_program prog =
   end;
   List.iter (emit_truth_table e) prog.truth_tables;
 
-  (* Emit all plans *)
   List.iter (emit_plan e) prog.plans;
 
-  (* Emit main if we have a single plan *)
   (match prog.plans with
    | [p] -> emit_main e (Some p)
    | _ -> ());

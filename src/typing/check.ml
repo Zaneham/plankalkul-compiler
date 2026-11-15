@@ -1,39 +1,19 @@
-(** Type Checking for Plankalkul
-
-    Validates type compatibility using Zuse's numeric tower.
-    Narrower types implicitly widen to broader types:
-
-    Bit < A8 < A9 < A10 < A11 < A12 < A13
-
-    Where:
-    - Bit: single bit (0/1)
-    - A8: Natural number (unsigned)
-    - A9: Positive integer
-    - A10: Integer (signed)
-    - A11: Positive fraction
-    - A12: Fraction (signed real)
-    - A13: Complex number
-*)
-
 open Ast.Types
 open Ast.Syntax
 
-(** Type error *)
 type type_error = {
   message: string;
   loc: location option;
 }
 
-(** Numeric rank in Zuse's tower - higher can hold lower *)
 let numeric_rank = function
   | TPrimitive Bit -> 0
   | TPrimitive SignBit -> 1
   | TPrimitive (BitWidth n) ->
-    (* S1.n fits between Bit and A8 based on bit width *)
     if n <= 1 then 0
-    else if n <= 8 then 2  (* Same as A8 *)
-    else if n <= 16 then 3 (* Same as A9 *)
-    else 4                 (* Same as A10 *)
+    else if n <= 8 then 2
+    else if n <= 16 then 3
+    else 4
   | TNumeric A8 -> 2
   | TNumeric A9 -> 3
   | TNumeric A10 -> 4
@@ -44,34 +24,27 @@ let numeric_rank = function
   | TMultiArray _ -> -1
   | TTuple _ -> -1
   | TUserDefined _ -> -1
-  | TInferred -> 4 (* Treat as A10 for compatibility *)
+  | TInferred -> 4
 
-(** Check if t1 can be assigned to t2 (t1 fits into t2) *)
 let can_widen t1 t2 =
   let r1 = numeric_rank t1 in
   let r2 = numeric_rank t2 in
-  (* Both numeric and t1 can widen to t2 *)
   r1 >= 0 && r2 >= 0 && r1 <= r2
 
-(** Check if two types are compatible for a binary operation *)
 let types_compatible t1 t2 =
   match t1, t2 with
-  (* Same type - always compatible *)
   | t1, t2 when equal_typ t1 t2 -> true
 
-  (* Inferred is compatible with anything *)
   | TInferred, _ | _, TInferred -> true
 
-  (* Numeric types - check widening in either direction *)
   | t1, t2 ->
     let r1 = numeric_rank t1 in
     let r2 = numeric_rank t2 in
-    r1 >= 0 && r2 >= 0  (* Both numeric = compatible *)
+    r1 >= 0 && r2 >= 0
 
-(** Check assignment compatibility: can expr_typ be assigned to var_typ? *)
 let check_assignment ~expr_typ ~var_typ =
   match var_typ with
-  | TInferred -> None  (* Inferred accepts anything *)
+  | TInferred -> None
   | _ when types_compatible expr_typ var_typ -> None
   | _ ->
     Some {
@@ -80,13 +53,10 @@ let check_assignment ~expr_typ ~var_typ =
       loc = None
     }
 
-(** Determine result type of a binary operation *)
 let check_binop op left_typ right_typ =
   match op with
-  (* Arithmetic operations *)
   | OpAdd | OpSub | OpMul | OpDiv ->
     if types_compatible left_typ right_typ then
-      (* Result is the wider type *)
       let r1 = numeric_rank left_typ in
       let r2 = numeric_rank right_typ in
       Ok (if r1 >= r2 then left_typ else right_typ)
@@ -97,7 +67,6 @@ let check_binop op left_typ right_typ =
         loc = None
       }
 
-  (* Comparison operations - result is always Bit *)
   | OpEq | OpNeq | OpLt | OpGt | OpLeq | OpGeq ->
     if types_compatible left_typ right_typ then
       Ok (TPrimitive Bit)
@@ -108,7 +77,6 @@ let check_binop op left_typ right_typ =
         loc = None
       }
 
-  (* Logical operations - operands should be Bit-like, result is Bit *)
   | OpAnd | OpOr | OpImpl | OpEquiv | OpXor ->
     let is_bool t = match t with
       | TPrimitive Bit | TPrimitive SignBit | TInferred -> true
@@ -123,16 +91,12 @@ let check_binop op left_typ right_typ =
         loc = None
       }
 
-  (* Set membership *)
   | OpIn ->
-    (* Left is element, right is set/array - result is Bit *)
     Ok (TPrimitive Bit)
 
-(** Check a unary operation *)
 let check_unop op operand_typ =
   match op with
   | OpNot ->
-    (* Logical not expects bit type *)
     (match operand_typ with
      | TPrimitive Bit | TPrimitive SignBit | TInferred ->
        Ok (TPrimitive Bit)
@@ -144,7 +108,6 @@ let check_unop op operand_typ =
        })
 
   | OpNeg ->
-    (* Arithmetic negation preserves numeric type *)
     let r = numeric_rank operand_typ in
     if r >= 0 then Ok operand_typ
     else Error {
@@ -154,7 +117,6 @@ let check_unop op operand_typ =
     }
 
   | OpAbs ->
-    (* Absolute value preserves numeric type *)
     let r = numeric_rank operand_typ in
     if r >= 0 then Ok operand_typ
     else Error {
@@ -163,7 +125,6 @@ let check_unop op operand_typ =
       loc = None
     }
 
-(** Collect all type errors from an expression *)
 let rec check_expr expr =
   match expr.expr_desc with
   | ELit _ | EVar _ -> []
@@ -196,7 +157,6 @@ let rec check_expr expr =
   | EMu (_, e, _) | ELambda (_, e, _) ->
     check_expr e
 
-(** Collect type errors from a statement *)
 let rec check_stmt stmt =
   match stmt.stmt_desc with
   | SEmpty | SFin -> []
@@ -236,10 +196,8 @@ let rec check_stmt stmt =
   | SLoopW6 (list_expr, _, body) ->
     check_expr list_expr @ check_stmt body
 
-(** Check a complete plan, returning list of errors *)
 let check_plan (plan : plan) =
   check_stmt plan.body
 
-(** Check a complete program, returning list of errors *)
 let check_program (prog : program) =
   List.concat_map check_plan prog.plans

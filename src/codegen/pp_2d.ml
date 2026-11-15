@@ -1,35 +1,18 @@
-(** 2D Notation Pretty-Printer for Plankalkül
-
-    Converts AST back to Zuse's original two-dimensional notation.
-
-    The output looks like:
-    ```
-     | V + V => R
-    V|  0   1      0
-    K|
-    S|  i   i      i
-    ```
-
-    Attribution:
-    - 2D notation from Zuse's original manuscripts (1941-1945)
-    - Implementation by Zane Hambly (2025-2026)
-*)
+(* Zuse's 2D notation puts the expression on top, with variable indices on the V row, components on K and structure types on S. *)
 
 open Ast.Syntax
 open Ast.Types
 
-(** A variable occurrence with its position in the expression *)
 type var_occurrence = {
-  col: int;           (** Column position in expression row *)
-  width: int;         (** Width of the variable text *)
-  var: var;           (** The variable *)
+  col: int;
+  width: int;
+  var: var;
 }
 
-(** State for building 2D output *)
 type pp_state = {
-  mutable expr_buf: Buffer.t;     (** Expression row content *)
-  mutable col: int;               (** Current column *)
-  mutable occurrences: var_occurrence list;  (** Variable positions *)
+  mutable expr_buf: Buffer.t;
+  mutable col: int;
+  mutable occurrences: var_occurrence list;
 }
 
 let create_state () = {
@@ -38,12 +21,10 @@ let create_state () = {
   occurrences = [];
 }
 
-(** Add text to expression, tracking column *)
 let emit state s =
   Buffer.add_string state.expr_buf s;
   state.col <- state.col + String.length s
 
-(** Add a variable, recording its position *)
 let emit_var state v =
   let kind_char = match v.kind with
     | VarV -> "V"
@@ -58,7 +39,6 @@ let emit_var state v =
     var = v;
   } :: state.occurrences
 
-(** Pretty-print a binary operator *)
 let pp_binop = function
   | OpAdd -> "+"
   | OpSub -> "-"
@@ -77,13 +57,11 @@ let pp_binop = function
   | OpXor -> "^"
   | OpIn -> "in"
 
-(** Pretty-print a unary operator *)
 let pp_unop = function
   | OpNot -> "!"
   | OpNeg -> "-"
-  | OpAbs -> "|"  (* Special - needs closing | too *)
+  | OpAbs -> "|"
 
-(** Pretty-print an expression, collecting variable occurrences *)
 let rec pp_expr state e =
   match e.expr_desc with
   | ELit (LitInt n) ->
@@ -153,18 +131,15 @@ let rec pp_expr state e =
     pp_expr state list;
     emit state ")"
 
-(** Build a row with values at specific column positions *)
 let build_row prefix width occurrences get_value =
   let buf = Buffer.create (width + 3) in
   Buffer.add_string buf prefix;
   Buffer.add_char buf '|';
 
-  (* Fill with spaces, placing values at occurrence positions *)
   let row_content = Bytes.make width ' ' in
   List.iter (fun occ ->
     let value = get_value occ.var in
     if String.length value > 0 && occ.col < width then begin
-      (* Place value at column, right-aligned within the variable width *)
       let start = min occ.col (width - String.length value) in
       String.iteri (fun i c ->
         if start + i < width then
@@ -176,10 +151,8 @@ let build_row prefix width occurrences get_value =
   Buffer.add_bytes buf row_content;
   Buffer.contents buf
 
-(** Get the index string for a variable *)
 let get_var_index v = string_of_int v.index
 
-(** Get the component string for a variable *)
 let get_var_component v =
   match v.component with
   | None -> ""
@@ -194,22 +167,20 @@ let get_var_component v =
                      string_of_int iv.index
     ) elems)
 
-(** Get the type string for a variable *)
 let get_var_type v =
   match v.typ with
-  | None -> "i"  (* Default to integer *)
+  | None -> "i"
   | Some (TPrimitive Bit) -> "0"
   | Some (TPrimitive SignBit) -> "S0"
-  | Some (TNumeric A10) -> "i"  (* Integer - most common *)
-  | Some (TNumeric A8) -> "N"   (* Natural *)
-  | Some (TNumeric A9) -> "Z+"  (* Positive integer *)
-  | Some (TNumeric A11) -> "Q+" (* Positive fraction *)
-  | Some (TNumeric A12) -> "Q"  (* Fraction *)
-  | Some (TNumeric A13) -> "C"  (* Complex *)
+  | Some (TNumeric A10) -> "i"
+  | Some (TNumeric A8) -> "N"
+  | Some (TNumeric A9) -> "Z+"
+  | Some (TNumeric A11) -> "Q+"
+  | Some (TNumeric A12) -> "Q"
+  | Some (TNumeric A13) -> "C"
   | Some TInferred -> "?"
   | Some _ -> "?"
 
-(** Pretty-print a statement as 2D block *)
 let pp_stmt_2d stmt =
   let lines = ref [] in
 
@@ -307,16 +278,13 @@ let pp_stmt_2d stmt =
   pp_stmt stmt;
   !lines
 
-(** Pretty-print a plan signature as 2D block *)
 let pp_plan_signature plan =
   let state = create_state () in
 
-  (* Plan name *)
   (match plan.plan_name with
    | Some name -> emit state name
    | None -> emit state "P");
 
-  (* Input parameters *)
   emit state "(";
   List.iteri (fun i v ->
     if i > 0 then emit state ", ";
@@ -324,7 +292,6 @@ let pp_plan_signature plan =
   ) plan.signature.inputs;
   emit state ")";
 
-  (* Output *)
   emit state " => ";
   List.iteri (fun i v ->
     if i > 0 then emit state ", ";
@@ -341,13 +308,11 @@ let pp_plan_signature plan =
 
   [expr_row; v_row; k_row; s_row; ""]
 
-(** Pretty-print an entire plan *)
 let pp_plan plan =
   let sig_lines = pp_plan_signature plan in
   let body_lines = pp_stmt_2d plan.body in
   sig_lines @ body_lines @ ["FIN"; ""]
 
-(** Pretty-print an entire program *)
 let pp_program prog =
   let header = [
     "; Plankalkül Program";
@@ -358,6 +323,5 @@ let pp_program prog =
   let plan_lines = List.concat_map pp_plan prog.plans in
   header @ plan_lines
 
-(** Convert program to 2D notation string *)
 let to_string prog =
   String.concat "\n" (pp_program prog)
