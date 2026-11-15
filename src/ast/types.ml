@@ -1,20 +1,10 @@
-(** Plankalkul Type System
-
-    The type system is built from bits upward:
-    - Primitive: single bit (Ja-Nein-Werte)
-    - Arrays: n × σ
-    - Tuples: (σ, τ)
-    - Predefined numeric types (A8-A13)
-*)
-
-(** Primitive types *)
 type primitive =
-  | Bit                     (** Single bit (0) - Ja-Nein-Werte *)
-  | SignBit                 (** Sign bit (S0) *)
-  | BitWidth of int         (** S1.n - n-bit integer (historical notation) *)
+  | Bit                     (** Zuse's Ja-Nein-Wert, written 0 *)
+  | SignBit
+  | BitWidth of int         (** S1.n, Zuse's n-bit integer *)
 [@@deriving show, eq]
 
-(** Predefined numeric types from Zuse's manuscript *)
+(** The numeric types A8 to A13 from Zuse's manuscripts *)
 type numeric_type =
   | A8                       (** Natural number *)
   | A9                       (** Positive integer *)
@@ -24,26 +14,23 @@ type numeric_type =
   | A13                      (** Complex number *)
 [@@deriving show, eq]
 
-(** Full type representation *)
 type typ =
   | TPrimitive of primitive
   | TNumeric of numeric_type
-  | TArray of int * typ                (** n × σ - array of n elements *)
-  | TMultiArray of int list * typ      (** m × n × ... × σ - multi-dimensional *)
-  | TTuple of typ list                 (** (σ, τ, ...) *)
-  | TUserDefined of string             (** User-defined composite type *)
-  | TInferred                          (** Type to be inferred *)
+  | TArray of int * typ
+  | TMultiArray of int list * typ
+  | TTuple of typ list
+  | TUserDefined of string
+  | TInferred
 [@@deriving show, eq]
 
-(** Type annotation as it appears in source *)
 type type_annotation = {
-  bits: int option;           (** Bit width if specified *)
-  dimensions: int list;       (** Array dimensions *)
+  bits: int option;
+  dimensions: int list;
   numeric: numeric_type option;
 }
 [@@deriving show]
 
-(** Pretty print a type *)
 let rec pp_typ fmt = function
   | TPrimitive Bit -> Format.fprintf fmt "0"
   | TPrimitive SignBit -> Format.fprintf fmt "S0"

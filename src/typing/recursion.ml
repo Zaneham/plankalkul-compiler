@@ -1,42 +1,20 @@
-(** Recursion Analysis for Plankalkül
-
-    Constructs the call graph and identifies recursive plans, both direct
-    (the straightforward case of a plan calling itself) and indirect
-    (the more devious case of mutual recursion).
-
-    Historical note: While Zuse's manuscripts show recursive algorithms
-    such as factorial, it remains unclear whether the Z3 could have
-    handled them without, shall we say, "stack overflow." We add runtime
-    depth checks because modern memory is plentiful but not infinite,
-    and watching a program consume all available RAM is educational
-    only the first time.
-
-    The analysis uses depth-first search on the call graph, which is
-    fitting given that recursion itself is just depth-first execution.
-*)
-
 open Ast.Syntax
 
-(** Call graph node *)
 type call_info = {
-  caller: string;      (** Calling plan name *)
-  callee: string;      (** Called plan name *)
-  is_direct: bool;     (** Direct vs indirect call *)
+  caller: string;
+  callee: string;
+  is_direct: bool;
 }
 
-(** Call graph: maps plan name to list of calls it makes *)
 type call_graph = (string, string list) Hashtbl.t
 
-(** Set of plan names that are recursive *)
 type recursive_set = (string, unit) Hashtbl.t
 
-(** Get plan name as string *)
 let plan_name_str plan =
   match plan.plan_name with
   | Some name -> name
   | None -> Printf.sprintf "P%d" plan.plan_ref.plan_number
 
-(** Collect all plan calls from an expression *)
 let rec collect_calls_expr acc expr =
   match expr.expr_desc with
   | EPlanCall (ref, args) ->
@@ -62,7 +40,6 @@ let rec collect_calls_expr acc expr =
     collect_calls_expr acc pred
   | EVar _ | ELit _ -> acc
 
-(** Collect all plan calls from a statement *)
 let rec collect_calls_stmt acc stmt =
   match stmt.stmt_desc with
   | SEmpty | SFin -> acc
@@ -91,19 +68,16 @@ let rec collect_calls_stmt acc stmt =
     let acc = collect_calls_expr acc list_expr in
     collect_calls_stmt acc body
 
-(** Build call graph from program *)
 let build_call_graph (prog : program) : call_graph =
   let graph = Hashtbl.create 16 in
   List.iter (fun plan ->
     let name = plan_name_str plan in
     let calls = collect_calls_stmt [] plan.body in
-    (* Deduplicate *)
     let unique_calls = List.sort_uniq String.compare calls in
     Hashtbl.add graph name unique_calls
   ) prog.plans;
   graph
 
-(** Detect cycles using DFS - returns true if cycle found starting from node *)
 let rec has_cycle graph visited in_stack node =
   if Hashtbl.mem in_stack node then true
   else if Hashtbl.mem visited node then false
@@ -116,21 +90,17 @@ let rec has_cycle graph visited in_stack node =
     found_cycle
   end
 
-(** Find all recursive plans in the program *)
 let find_recursive_plans (prog : program) : recursive_set =
   let graph = build_call_graph prog in
   let recursive = Hashtbl.create 8 in
 
-  (* For each plan, check if it can reach itself *)
   List.iter (fun plan ->
     let name = plan_name_str plan in
     let callees = try Hashtbl.find graph name with Not_found -> [] in
 
-    (* Check for direct self-recursion *)
     if List.mem name callees then
       Hashtbl.add recursive name ()
     else begin
-      (* Check for indirect recursion - can we reach back to ourselves? *)
       let visited = Hashtbl.create 16 in
       let in_stack = Hashtbl.create 16 in
       Hashtbl.add in_stack name ();
@@ -144,10 +114,8 @@ let find_recursive_plans (prog : program) : recursive_set =
 
   recursive
 
-(** Check if a plan name is recursive *)
 let is_recursive recursive_set name =
   Hashtbl.mem recursive_set name
 
-(** Analyze program and return the set of recursive plans *)
 let analyze (prog : program) : recursive_set =
   find_recursive_plans prog

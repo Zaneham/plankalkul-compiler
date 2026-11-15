@@ -1,56 +1,27 @@
-(** Source Provenance Tracking
-
-    Every Plankalkül construct can be traced to its historical source.
-    This matters because Zuse refined the language over decades.
-
-    Provenance layers (in order of authority):
-    1. PRIMARY: 1941-1945 wartime manuscripts
-    2. SECONDARY: 1945-1949 post-war formalisations
-    3. TERTIARY: 1972 published paper
-    4. QUATERNARY: 1998-2000 FU Berlin implementation choices
-    5. QUINARY: 2010 Bruines formal semantics
-
-    When in doubt, defer to the earlier source.
-
-    Attribution: Provenance system by Zane Hambly (2025-2026)
-    For Prof. Raúl Rojas and the academic community.
-*)
-
-(* ============================================================================
-   ARCHIVE IDENTIFIERS
-   ============================================================================ *)
-
-(** Zuse Internet Archive document identifiers *)
 type archive_id =
-  | ZIA_0367      (** 1941 - Logical formalisms, chess *)
-  | ZIA_0368      (** 1941 - Schachprogramme preliminary *)
-  | ZIA_0410      (** 1942 - Chess programming elaborations *)
+  | ZIA_0367      (** 1941, logical formalisms and chess *)
+  | ZIA_0368      (** 1941, preliminary Schachprogramme *)
+  | ZIA_0410      (** 1942, chess programming elaborations *)
   | TAL_1         (** Theorie der Angewandten Logistik, Book 1 *)
   | TAL_2         (** Theorie der Angewandten Logistik, Book 2 *)
-  | GMD_1972      (** 1972 GMD Report "Der Plankalkül" *)
-  | FUB_2000      (** FU Berlin implementation *)
-  | Bruines_2010  (** Bruines thesis *)
-  | Hovestar      (** Hovestar reference implementation *)
-  | Custom of string  (** For other sources *)
+  | GMD_1972      (** 1972 GMD report, Der Plankalkül *)
+  | FUB_2000      (** FU Berlin implementation, Rojas et al. 2000 *)
+  | Bruines_2010
+  | Hovestar
+  | Custom of string
 [@@deriving show, eq]
 
-(* ============================================================================
-   MANUSCRIPT DATABASE
-   ============================================================================ *)
-
-(** Full manuscript metadata *)
 type manuscript = {
   id: archive_id;
-  title_de: string;           (** Original German title *)
-  title_en: string;           (** English translation *)
+  title_de: string;
+  title_en: string;
   year: int;
   pages: int;
-  archive_url: string option; (** Link to Zuse Internet Archive *)
+  archive_url: string option;
   description: string;
 }
 [@@deriving show]
 
-(** The canonical manuscript database *)
 let manuscripts = [
   { id = ZIA_0367;
     title_de = "Vorbereitung des Plankalküls, logische Formalismen, Schachspiel";
@@ -83,7 +54,7 @@ let manuscripts = [
     title_de = "Theorie der Angewandten Logistik, Band 2";
     title_en = "Theory of Applied Logistics, Volume 2";
     year = 1945;
-    pages = 0;  (* Unknown *)
+    pages = 0;
     archive_url = None;
     description = "Post-war formalisation of Plankalkül. \
                    More systematic treatment of the type system and control flow.";
@@ -117,46 +88,29 @@ let manuscripts = [
   };
 ]
 
-(** Look up manuscript by ID *)
 let find_manuscript id =
   List.find_opt (fun m -> m.id = id) manuscripts
 
-(* ============================================================================
-   CONFIDENCE LEVELS
-   ============================================================================ *)
-
-(** How confident are we in this provenance? *)
 type confidence =
   | Verified of string option
-      (** Exact match to manuscript text. Optional: the original text. *)
   | Interpreted
-      (** Clear meaning from manuscript, adapted for our syntax. *)
   | Inferred
-      (** Not explicitly in manuscript, but logically necessary. *)
   | Deviation of string
-      (** Deliberate departure from manuscript, with reason. *)
 [@@deriving show, eq]
 
-(** Is this confidence level trustworthy for academic citation? *)
 let is_citable = function
   | Verified _ | Interpreted -> true
   | Inferred | Deviation _ -> false
 
-(* ============================================================================
-   SOURCE REFERENCES
-   ============================================================================ *)
-
-(** Provenance layer - how authoritative is this interpretation? *)
 type provenance_layer =
-  | Primary     (** 1941-1945 manuscripts - the real stuff *)
-  | Secondary   (** 1945-1949 post-war formalisation *)
-  | Tertiary    (** 1972 published paper *)
-  | Quaternary  (** 1998-2000 implementation decisions *)
-  | Quinary     (** 2010 formal semantics *)
-  | Modern      (** Our additions/interpretations *)
+  | Primary
+  | Secondary
+  | Tertiary
+  | Quaternary
+  | Quinary
+  | Modern
 [@@deriving show, eq, ord]
 
-(** Year ranges for each layer *)
 let layer_years = function
   | Primary -> (1941, 1945)
   | Secondary -> (1945, 1949)
@@ -165,7 +119,6 @@ let layer_years = function
   | Quinary -> (2010, 2010)
   | Modern -> (2025, 2100)
 
-(** Determine layer from year *)
 let layer_of_year year =
   if year >= 1941 && year <= 1945 then Primary
   else if year >= 1945 && year <= 1949 then Secondary
@@ -174,18 +127,16 @@ let layer_of_year year =
   else if year = 2010 then Quinary
   else Modern
 
-(** Source document reference *)
 type source_ref = {
   archive_id: archive_id;
-  page: int option;           (** Page number if known *)
-  section: string option;     (** Section/chapter if applicable *)
-  year: int;                  (** Year of the source *)
-  original_text: string option;  (** Exact transcription from manuscript *)
-  original_formula: string option;  (** Mathematical formula if applicable *)
+  page: int option;
+  section: string option;
+  year: int;
+  original_text: string option;
+  original_formula: string option;
 }
 [@@deriving show]
 
-(** Create a source reference *)
 let make_source_ref ~archive_id ?page ?section ?original_text ?original_formula () =
   let year = match find_manuscript archive_id with
     | Some m -> m.year
@@ -193,23 +144,17 @@ let make_source_ref ~archive_id ?page ?section ?original_text ?original_formula 
   in
   { archive_id; page; section; year; original_text; original_formula }
 
-(* ============================================================================
-   FULL PROVENANCE
-   ============================================================================ *)
-
-(** Full provenance information for a construct *)
 type provenance = {
-  primary_source: source_ref option;     (** Main source *)
-  supporting_sources: source_ref list;   (** Additional sources *)
+  primary_source: source_ref option;
+  supporting_sources: source_ref list;
   confidence: confidence;
   layer: provenance_layer;
-  notes: string option;                  (** Implementation notes *)
-  verified_by: string option;            (** Who verified against manuscript *)
-  verification_date: string option;      (** When verified *)
+  notes: string option;
+  verified_by: string option;
+  verification_date: string option;
 }
 [@@deriving show]
 
-(** Unknown/unattributed provenance *)
 let unknown = {
   primary_source = None;
   supporting_sources = [];
@@ -220,18 +165,12 @@ let unknown = {
   verification_date = None;
 }
 
-(** Create an inferred provenance with notes *)
 let inferred ?notes () = {
   unknown with
   confidence = Inferred;
   notes;
 }
 
-(* ============================================================================
-   PROVENANCE BUILDERS
-   ============================================================================ *)
-
-(** Create a provenance from the 1941 logical formalisms manuscript *)
 let from_zia_0367 ?page ?section ?original_text ?original_formula ?notes () = {
   primary_source = Some {
     archive_id = ZIA_0367;
@@ -249,7 +188,6 @@ let from_zia_0367 ?page ?section ?original_text ?original_formula ?notes () = {
   verification_date = None;
 }
 
-(** Create a provenance from the 1941 schachprogramme manuscript *)
 let from_zia_0368 ?page ?section ?original_text ?original_formula ?notes () = {
   primary_source = Some {
     archive_id = ZIA_0368;
@@ -267,7 +205,6 @@ let from_zia_0368 ?page ?section ?original_text ?original_formula ?notes () = {
   verification_date = None;
 }
 
-(** Create a provenance from the 1942 chess manuscript *)
 let from_zia_0410 ?page ?section ?original_text ?original_formula ?notes () = {
   primary_source = Some {
     archive_id = ZIA_0410;
@@ -285,7 +222,6 @@ let from_zia_0410 ?page ?section ?original_text ?original_formula ?notes () = {
   verification_date = None;
 }
 
-(** Create a provenance from Bruines thesis *)
 let from_bruines ?page ?section ?original_text ?notes () = {
   primary_source = Some {
     archive_id = Bruines_2010;
@@ -303,7 +239,6 @@ let from_bruines ?page ?section ?original_text ?notes () = {
   verification_date = None;
 }
 
-(** Create a provenance from FU Berlin implementation *)
 let from_fu_berlin ?notes () = {
   primary_source = Some {
     archive_id = FUB_2000;
@@ -321,7 +256,6 @@ let from_fu_berlin ?notes () = {
   verification_date = None;
 }
 
-(** Create a verified provenance with original text *)
 let verified ~archive_id ~page ~original_text ?original_formula ?notes () =
   let year = match find_manuscript archive_id with
     | Some m -> m.year
@@ -344,20 +278,17 @@ let verified ~archive_id ~page ~original_text ?original_formula ?notes () =
     verification_date = None;
   }
 
-(** Mark a provenance as verified by someone *)
 let mark_verified ~by ~date prov = {
   prov with
   verified_by = Some by;
   verification_date = Some date;
 }
 
-(** Add a supporting source *)
 let add_supporting_source src prov = {
   prov with
   supporting_sources = src :: prov.supporting_sources;
 }
 
-(** Create a deviation provenance *)
 let deviation ~reason ?based_on ?notes () = {
   primary_source = based_on;
   supporting_sources = [];
@@ -368,15 +299,9 @@ let deviation ~reason ?based_on ?notes () = {
   verification_date = None;
 }
 
-(* ============================================================================
-   PROVENANCE MERGING
-   ============================================================================ *)
-
-(** Compare provenance authority - earlier/more primary wins *)
 let compare_authority p1 p2 =
   compare_provenance_layer p1.layer p2.layer
 
-(** Merge two provenances, preferring the more authoritative *)
 let merge p1 p2 =
   if compare_authority p1 p2 <= 0 then
     { p1 with supporting_sources =
@@ -389,11 +314,6 @@ let merge p1 p2 =
          | Some s -> s :: p2.supporting_sources @ p1.supporting_sources
          | None -> p2.supporting_sources @ p1.supporting_sources) }
 
-(* ============================================================================
-   CITATION FORMATTING
-   ============================================================================ *)
-
-(** Archive ID to string *)
 let archive_id_to_string = function
   | ZIA_0367 -> "ZIA-0367"
   | ZIA_0368 -> "ZIA-0368"
@@ -406,14 +326,12 @@ let archive_id_to_string = function
   | Hovestar -> "Hovestar"
   | Custom s -> s
 
-(** Pretty-print a source reference (short form) *)
 let pp_source_short fmt src =
   let id_str = archive_id_to_string src.archive_id in
   match src.page with
   | Some p -> Format.fprintf fmt "%s, p.%d" id_str p
   | None -> Format.fprintf fmt "%s" id_str
 
-(** Pretty-print a provenance (short form for error messages) *)
 let pp_short fmt prov =
   match prov.primary_source with
   | None ->
@@ -430,7 +348,6 @@ let pp_short fmt prov =
     in
     Format.fprintf fmt "[%a (%d)%s]" pp_source_short src src.year conf_str
 
-(** Full academic citation *)
 let cite_source src =
   let base = match src.archive_id with
     | ZIA_0367 ->
@@ -459,7 +376,6 @@ let cite_source src =
   | None, Some s -> Printf.sprintf "%s, Section %s" base s
   | None, None -> base
 
-(** Full citation for a provenance *)
 let cite prov =
   let primary = match prov.primary_source with
     | None ->
@@ -486,7 +402,6 @@ let cite prov =
   in
   primary ^ original ^ supporting ^ verification
 
-(** Generate a C comment with provenance *)
 let to_c_comment prov =
   match prov.primary_source with
   | None -> "/* Source: inferred */"
@@ -511,11 +426,6 @@ let to_c_comment prov =
       in
       base ^ page ^ original ^ conf ^ " */"
 
-(* ============================================================================
-   FEATURE REGISTRY
-   ============================================================================ *)
-
-(** Language features and their provenance *)
 type feature =
   | FeatureLoopW
   | FeatureLoopW0
@@ -551,7 +461,6 @@ type feature =
   | FeatureChessPredicates
 [@@deriving show, eq]
 
-(** Feature registry with canonical provenance *)
 let feature_provenance = function
   | FeatureLoopW ->
       from_bruines ~page:7
@@ -634,21 +543,14 @@ let feature_provenance = function
                 Spr (Springer/knight), Ben (adjacent), gus (queen-like)." ()
   | _ -> unknown
 
-(** Get the canonical provenance for a language feature *)
 let provenance_for_feature = feature_provenance
 
-(* ============================================================================
-   BIBLIOGRAPHY GENERATION
-   ============================================================================ *)
-
-(** Collect all unique sources from a list of provenances *)
 let collect_sources provs =
   let all_sources = List.concat_map (fun p ->
     match p.primary_source with
     | Some s -> s :: p.supporting_sources
     | None -> p.supporting_sources
   ) provs in
-  (* Deduplicate by archive_id and page *)
   let seen = Hashtbl.create 16 in
   List.filter (fun s ->
     let key = (s.archive_id, s.page) in
@@ -656,7 +558,6 @@ let collect_sources provs =
     else (Hashtbl.add seen key (); true)
   ) all_sources
 
-(** Generate a bibliography from collected sources *)
 let generate_bibliography provs =
   let sources = collect_sources provs in
   let by_archive = Hashtbl.create 8 in
@@ -676,7 +577,6 @@ let generate_bibliography provs =
     in
     Buffer.add_string buf (Printf.sprintf "%s\n" title);
 
-    (* List pages used *)
     let pages = List.filter_map (fun s -> s.page) sources
                 |> List.sort_uniq compare in
     if pages <> [] then begin

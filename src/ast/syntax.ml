@@ -1,20 +1,6 @@
-(** Plankalkul Abstract Syntax Tree
-
-    Represents the full language including:
-    - 2D notation constructs
-    - All loop variants (W, W0-W5)
-    - Predicates and quantifiers
-    - Set/list operations
-    - Function templates
-
-    Every construct carries provenance information tracing it back
-    to its source document (1941-1945 manuscripts, 1972 paper, etc.)
-*)
-
 open Types
 open Provenance.Sources
 
-(** Source location for error reporting *)
 type location = {
   file: string;
   line: int;
@@ -26,124 +12,96 @@ type location = {
 
 let dummy_loc = { file = ""; line = 0; col = 0; end_line = 0; end_col = 0 }
 
-(** Variable kinds - V (input), Z (intermediate), R (result) *)
+(** Zuse's V (input), Z (Zwischenwerte, intermediate values) and R (result) variables *)
 type var_kind =
-  | VarV   (** Input parameter - readonly *)
-  | VarZ   (** Intermediate/local - Zwischenwerte *)
-  | VarR   (** Result *)
+  | VarV
+  | VarZ
+  | VarR
 [@@deriving show, eq]
 
-(** Variable reference with optional component index *)
 type var = {
   kind: var_kind;
-  index: int;                          (** Variable number (V0, V1, etc.) *)
-  component: component_index option;   (** Component/array index *)
-  typ: typ option;                     (** Type annotation *)
+  index: int;
+  component: component_index option;
+  typ: typ option;
   loc: location;
 }
 [@@deriving show]
 
-(** Single index element - either a literal int or a variable *)
 and index_element =
-  | IdxLit of int                      (** Literal index: 2 *)
-  | IdxVar of var                      (** Variable index: Z0 *)
+  | IdxLit of int
+  | IdxVar of var
 [@@deriving show]
 
-(** Component index - can be literal, indirect, or mixed for multi-dimensional *)
 and component_index =
-  | IndexLiteral of int list           (** Direct index: V0[2.3] - all literals *)
-  | IndexVar of var                    (** Indirect: V0[Z1] - single variable *)
-  | IndexMixed of index_element list   (** Mixed: V0[Z0][Z1] or V0[2][Z1] *)
+  | IndexLiteral of int list
+  | IndexVar of var
+  | IndexMixed of index_element list
 [@@deriving show]
 
-(** Literal values *)
 type literal =
-  | LitBit of bool                     (** + (true) or - (false) *)
+  | LitBit of bool                     (** Zuse writes true as + and false as - *)
   | LitInt of int
   | LitFloat of float
   | LitArray of literal list
   | LitTuple of literal list
 [@@deriving show]
 
-(** Binary operators *)
 type binop =
-  (* Arithmetic *)
   | OpAdd | OpSub | OpMul | OpDiv
-  (* Comparison *)
   | OpEq | OpNeq | OpLt | OpGt | OpLeq | OpGeq
-  (* Logical *)
   | OpAnd | OpOr | OpImpl | OpEquiv | OpXor
-  (* Set *)
-  | OpIn                               (** x ∈ l *)
+  | OpIn
 [@@deriving show, eq]
 
-(** Unary operators *)
 type unop =
-  | OpNot                              (** ¬ *)
-  | OpNeg                              (** Arithmetic negation *)
-  | OpAbs                              (** |x| absolute value *)
+  | OpNot
+  | OpNeg
+  | OpAbs
 [@@deriving show, eq]
 
-(** Plan group with optional Greek letter (Δ, Σ, etc.)
-
-    Zuse used Greek letters to categorize plans:
-    - PΔ300 = Plan Delta 300 (chess-related in manuscripts)
-    - P1.2 = Plan 2 in Group 1 (standard numeric grouping)
-
-    The Delta notation appears throughout ZIA-0410 for the chess plans.
-*)
+(** Zuse grouped plans under Greek letters, PΔ marking the chess plans of ZIA-0410 *)
 type plan_group_prefix =
-  | GroupNumeric of int                   (** P1.2 = group 1 *)
-  | GroupDelta                            (** PΔ = Delta group (chess) *)
-  | GroupSigma                            (** PΣ = Sigma group *)
-  | GroupPhi                              (** PΦ = Phi group *)
+  | GroupNumeric of int
+  | GroupDelta
+  | GroupSigma
+  | GroupPhi
 [@@deriving show, eq]
 
-(** Expressions *)
 type expr = {
   expr_desc: expr_desc;
-  expr_typ: typ option;                (** Type after inference *)
+  expr_typ: typ option;
   expr_loc: location;
 }
 [@@deriving show]
 
 and expr_desc =
-  | EVar of var                        (** Variable reference *)
-  | ELit of literal                    (** Literal value *)
-  | EBinop of binop * expr * expr      (** Binary operation *)
-  | EUnop of unop * expr               (** Unary operation *)
-  | EPlanCall of plan_ref * expr list  (** Call another plan *)
+  | EVar of var
+  | ELit of literal
+  | EBinop of binop * expr * expr
+  | EUnop of unop * expr
+  | EPlanCall of plan_ref * expr list
 
-  (* Set/List operations - the functional programming features! *)
-  | ECardinality of expr               (** N(l) - length/size *)
-  | EFindUnique of var * expr * expr   (** ´x(x ∈ l ∧ R(x)) *)
-  | EFilterSet of var * expr * expr    (** ˆx(x ∈ l ∧ R(x)) - filter to set *)
-  | EFilterSeq of var * expr * expr    (** ˆˆx(x ∈ l ∧ R(x)) - filter to seq *)
+  | ECardinality of expr               (** N(l), the number of elements of l *)
+  | EFindUnique of var * expr * expr   (** ´x(x ∈ l ∧ R(x)), the one element of l satisfying R *)
+  | EFilterSet of var * expr * expr    (** ˆx(x ∈ l ∧ R(x)), filter to a set *)
+  | EFilterSeq of var * expr * expr    (** ˆˆx(x ∈ l ∧ R(x)), filter to a sequence *)
 
-  (* Quantifiers *)
-  | EForall of var * expr * expr       (** (x)(x ∈ l ⇒ R(x)) *)
-  | EExists of var * expr * expr       (** (Ex)(x ∈ l ⇒ R(x)) *)
+  | EForall of var * expr * expr       (** (x)(x ∈ l ⇒ R(x)), Zuse's universal quantifier *)
+  | EExists of var * expr * expr       (** (Ex)(x ∈ l ⇒ R(x)), Zuse's existential quantifier *)
 
-  (* Iteration expressions (for use in loops) *)
-  | EMu of var * expr * expr           (** µx - forward iterator *)
-  | ELambda of var * expr * expr       (** λx - backward iterator *)
+  | EMu of var * expr * expr           (** µx, the forward iterator *)
+  | ELambda of var * expr * expr       (** λx, the backward iterator *)
 [@@deriving show]
 
-(** Plan reference - for calling other plans
-
-    Supports both numeric grouping (P1.2) and Greek letter prefixes (PΔ300).
-    The Delta notation was Zuse's convention for chess-related plans in
-    the 1942 manuscripts.
-*)
 and plan_ref = {
-  plan_group: int option;              (** Numeric group number (P1.2 = group 1) *)
-  plan_prefix: plan_group_prefix option; (** Greek letter prefix (PΔ, PΣ, etc.) *)
-  plan_number: int;                    (** Plan number within group *)
-  plan_name: string option;            (** Plan name for resolution *)
+  plan_group: int option;
+  plan_prefix: plan_group_prefix option;
+  plan_number: int;
+  plan_name: string option;
 }
 [@@deriving show]
 
-(** Statements *)
 type stmt = {
   stmt_desc: stmt_desc;
   stmt_loc: location;
@@ -151,41 +109,40 @@ type stmt = {
 [@@deriving show]
 
 and stmt_desc =
-  | SAssign of expr * var              (** expr ⇒ var *)
-  | SConditional of expr * stmt        (** b →̇ S *)
-  | SSequence of stmt list             (** S1 | S2 or S1; S2 *)
-  | SBlock of stmt list                (** { S1 S2 ... } *)
+  | SAssign of expr * var              (** Zuse writes assignment as expr ⇒ var *)
+  | SConditional of expr * stmt        (** Zuse writes the conditional as b →̇ S *)
+  | SSequence of stmt list
+  | SBlock of stmt list
 
-  (* Loop constructs - all EIGHT per Bruines p.7, p.12 *)
-  | SLoopW of conditional_stmt list    (** W [ b1→S1; b2→S2; ... ] - repeat until all false or Fin *)
-  | SLoopW0 of expr * stmt             (** W0(n) [ S ] - repeat n times, counter hidden *)
-  | SLoopW1 of expr * var * stmt       (** W1(n) ⇒ i [ S ] - count up: i = 0..n-1 *)
-  | SLoopW2 of expr * var * stmt       (** W2(n) ⇒ i [ S ] - count down: i = n-1..0 *)
-  | SLoopW3 of expr * expr * var * stmt (** W3(n,m) ⇒ i [ S ] - while m ≥ n *)
-  | SLoopW4 of expr * expr * var * stmt (** W4(n,m) ⇒ i [ S ] - while m ≤ n *)
-  | SLoopW5 of expr * expr * var * stmt (** W5(n,m) ⇒ i [ S ] - toward m, auto-direction *)
-  | SLoopW6 of expr * var * stmt       (** W6(l) ⇒ x [ S ] - iterate list until empty (Bruines p.12) *)
+  (* The eight loop forms, per Bruines 2010 p.7 and p.12 *)
+  | SLoopW of conditional_stmt list    (** W [ b1→S1; b2→S2; ... ], repeat until every condition is false or Fin *)
+  | SLoopW0 of expr * stmt             (** W0(n) [ S ], repeat n times with the counter hidden *)
+  | SLoopW1 of expr * var * stmt       (** W1(n) ⇒ i [ S ], count i up from 0 to n-1 *)
+  | SLoopW2 of expr * var * stmt       (** W2(n) ⇒ i [ S ], count i down from n-1 to 0 *)
+  | SLoopW3 of expr * expr * var * stmt (** W3(n,m) ⇒ i [ S ], repeat while m ≥ n *)
+  | SLoopW4 of expr * expr * var * stmt (** W4(n,m) ⇒ i [ S ], repeat while m ≤ n *)
+  | SLoopW5 of expr * expr * var * stmt (** W5(n,m) ⇒ i [ S ], count towards m in whichever direction it lies *)
+  | SLoopW6 of expr * var * stmt       (** W6(l) ⇒ x [ S ], take elements of l until it is empty (Bruines p.12) *)
 
-  | SFin                               (** Fin - break/early termination (also returned by µ/λ) *)
-  | SEmpty                             (** No-op *)
+  | SFin                               (** Fin ends a loop early, and is also what µ and λ yield when exhausted *)
+  | SEmpty
 [@@deriving show]
 
-(** Conditional statement within W loop *)
 and conditional_stmt = {
-  cond: expr;                          (** Condition *)
-  body: stmt;                          (** Body to execute if true *)
+  cond: expr;
+  body: stmt;
 }
 [@@deriving show]
 
-(** Plan signature - the Randauszug *)
+(** Zuse's Randauszug, the plan signature *)
 type signature = {
-  inputs: var list;                    (** V parameters *)
-  outputs: var list;                   (** R results *)
-  chained_inputs: (plan_ref * int) list; (** R0 of Plan X.Y as input *)
+  inputs: var list;
+  outputs: var list;
+  chained_inputs: (plan_ref * int) list;
 }
 [@@deriving show]
 
-(** Assertion - Zuse had these before Eiffel! *)
+(** Pre and post conditions on plans, after Bruines 2010 p.4 *)
 type assertion = {
   assert_expr: expr;
   assert_msg: string option;
@@ -193,70 +150,53 @@ type assertion = {
 }
 [@@deriving show]
 
-(** A Plan (function/procedure) *)
 type plan = {
   plan_ref: plan_ref;
-  plan_name: string option;            (** Optional descriptive name *)
+  plan_name: string option;
   signature: signature;
-  preconditions: assertion list;       (** Pre-assertions *)
-  postconditions: assertion list;      (** Post-assertions *)
+  preconditions: assertion list;
+  postconditions: assertion list;
   body: stmt;
   plan_loc: location;
-  plan_provenance: provenance;         (** Source attribution *)
+  plan_provenance: provenance;
 }
 [@@deriving show]
 
-(** Function template - metaprogramming!
-    Allows passing a plan as argument to another plan *)
 type plan_template = {
   template_ref: plan_ref;
   template_name: string option;
-  param_plans: (string * signature) list;  (** Plan parameters with signatures *)
+  param_plans: (string * signature) list;
   signature: signature;
   body: stmt;
   template_loc: location;
 }
 [@@deriving show]
 
-(** Truth Table - Zuse's tabular conditional logic (ZIA-0368 pp.20-21)
-
-    A decision table mapping input combinations to output values.
-    Used extensively in the chess program for piece movement validation
-    and position evaluation. This represents one of the earliest forms
-    of declarative programming—specifying "what" rather than "how".
-
-    Example from manuscript:
-      a  b  c | F₁ F₂
-      -  -  - | +  +
-      -  -  + | +  +
-      ...
-*)
+(** Zuse's decision tables, used throughout the chess program (ZIA-0368 pp.20-21) *)
 type truth_table = {
-  table_name: string option;              (** Optional name for the table *)
-  table_inputs: string list;              (** Input column names (a, b, c, etc.) *)
-  table_outputs: string list;             (** Output column names (F₁, F₂, etc.) *)
-  table_rows: truth_row list;             (** The actual truth table rows *)
+  table_name: string option;
+  table_inputs: string list;
+  table_outputs: string list;
+  table_rows: truth_row list;
   table_loc: location;
 }
 [@@deriving show]
 
 and truth_row = {
-  row_inputs: bool list;                  (** Input values: + = true, - = false *)
-  row_outputs: bool list;                 (** Output values *)
+  row_inputs: bool list;
+  row_outputs: bool list;
 }
 [@@deriving show]
 
-(** A complete Plankalkul program *)
 type program = {
   plans: plan list;
   templates: plan_template list;
-  truth_tables: truth_table list;      (** Decision tables (ZIA-0368 style) *)
-  main_plan: plan_ref option;          (** Hauptplan *)
+  truth_tables: truth_table list;
+  main_plan: plan_ref option;          (** Zuse's Hauptplan, the main plan *)
 }
 [@@deriving show]
 
-(** Source format indicator *)
 type source_format =
-  | Format2D       (** Original Zuse 2D notation *)
-  | FormatLinear   (** Linearized modern notation *)
+  | Format2D
+  | FormatLinear
 [@@deriving show]

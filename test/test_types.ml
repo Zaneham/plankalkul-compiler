@@ -1,5 +1,3 @@
-(** Type System Tests *)
-
 open Ast.Types
 open Ast.Syntax
 
@@ -19,7 +17,6 @@ let test_valid_comparison () =
   Alcotest.(check int) "no type errors" 0 (List.length errors)
 
 let test_logical_op_error () =
-  (* Logical AND on non-bit types should error *)
   let _, errors = parse_and_check "bad (V0[:A10], V1[:A10]) => R0 { V0 & V1 => R0 }" in
   Alcotest.(check bool) "has type error" true (List.length errors > 0)
 
@@ -36,13 +33,11 @@ let test_numeric_inference () =
   Alcotest.(check bool) "expression has numeric type" true has_inferred_type
 
 let test_array_index_type () =
-  (* Accessing V0[i] on an array should return element type, not array type *)
   let prog, errors = parse_and_check
     "test (V0[:8*A10]) => R0 { V0[0] + 1 => R0 }" in
   Alcotest.(check int) "no type errors" 0 (List.length errors);
   let plan = List.hd prog.plans in
   let _ = plan in
-  (* Just check it parses and type-checks without error *)
   ()
 
 let tests = [

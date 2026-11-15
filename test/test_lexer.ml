@@ -1,11 +1,8 @@
-(** Lexer Tests *)
-
 open Lexer.Tokens
 open Lexer.Lexer_linear
 
 let test_tokenize_variable () =
   let tokens = tokenise_string "V0 Z1 R2" in
-  (* Filter out EOF and whitespace *)
   let tokens = List.filter (fun t -> t.typ <> EOF && t.typ <> NEWLINE) tokens in
   Alcotest.(check int) "three tokens" 3 (List.length tokens);
   Alcotest.(check bool) "first is V0" true
@@ -47,7 +44,6 @@ let test_tokenize_delta () =
     (match (List.nth tokens 2).typ with INTEGER 300 -> true | _ -> false)
 
 let test_unicode_normalization () =
-  (* Unicode Δ should normalize to separate Delta token *)
   let tokens = tokenise_string "PΔ300" in
   let tokens = List.filter (fun t -> t.typ <> EOF && t.typ <> NEWLINE) tokens in
   Alcotest.(check int) "PΔ300 = 3 tokens" 3 (List.length tokens);
@@ -76,20 +72,16 @@ let test_tokenize_lambda_iterator () =
   Alcotest.(check bool) "Z0" true
     (match (List.nth tokens 1).typ with VAR_Z 0 -> true | _ -> false)
 
-(* Phase 4.2: 2D alignment warning tests *)
 let test_2d_alignment_warnings () =
-  (* Misaligned 2D notation should generate warnings *)
   let misaligned = " | V + V => R\n\
                     V|   0     1       0\n\
                     K|\n\
                     S|         i       i       i\n" in
   let (_tokens, warnings) = Lexer.Lexer_2d.tokenise_with_warnings misaligned in
-  (* This should generate at least one warning about misalignment *)
   Alcotest.(check bool) "misaligned 2D generates warnings" true
     (List.length warnings > 0)
 
 let test_2d_basic_tokenization () =
-  (* Basic 2D notation should produce tokens *)
   let source = " | V + V => R\n\
                 V|  0   1      0\n\
                 K|\n\
