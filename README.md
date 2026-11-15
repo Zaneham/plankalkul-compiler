@@ -1,37 +1,31 @@
 # Plankalkül Compiler
 
-## What Is This?
-
 This is a compiler for **Plankalkül** (German: "Plan Calculus"), the world's first high-level programming language, designed by Konrad Zuse between 1942 and 1945.
 
-You may notice that some of his manuscripts are dated to 1941, thats because he made several chess programs, in his language, before working on the full language. Which is pretty amazing when you really think about it.
+Written in OCaml. Compiles to C. Handles both Zuse's original 2D notation and the linearised format used by later implementations.
 
-This compiler is written in OCaml. Compiles to C. Handles both Zuse's original 2D notation and the linearised format used by later implementations.
+## Background
 
-## Why Does This Exist?
+Zuse designed a complete high-level programming language, with data structures, user-defined types, assertions, nested scopes, and what we'd now recognise as functional programming features. The language wasn't implemented until 2000, when Prof. Raúl Rojas and his team at Freie Universität Berlin finally gave it life, 55 years after its design.
 
-Because Zuse deserved better.
+Existing implementations handle the *linearised* notation rather well. However, Zuse's actual notation was **two-dimensional**.
 
-The man designed a complete high-level programming language, with data structures, user-defined types, assertions, nested scopes, and what we'd now recognise as functional programming features, whilst hiding from Allied bombs in rural Bavaria. The language wasn't implemented until 2000, when Prof. Raúl Rojas and his team at Freie Universität Berlin finally gave it life, 55 years after its design.
-
-Existing implementations handle the *linearised* notation rather well. However, Zuse's actual notation was **two-dimensional**, a sort of spreadsheet-meets-lambda-calculus affair that looks like ASCII art designed by a mathematician with strong opinions about vertical alignment.
-
-This compiler aims to handle both :-) 
+This compiler aims to handle both :-)
 
 ## Features
 
-- **2D Notation Support** — Parse Zuse's original V/K/S row format with alignment warnings
-- **Linearised Notation** — For those who prefer their code horizontal
-- **Compiles to C** — Because LLVM would triple the project size and Zuse probably wouldn't approve of the complexity
-- **Source Provenance Tracking** — Every construct traced to its manuscript source
-- **All Seven Loop Variants** — W through W6, each with different semantics
-- **Quantifiers & Iterators** — ∀, ∃, μ, λ operators from Zuse's manuscripts
-- **Truth Tables** — Declarative decision tables (ZIA-0368)
-- **Plan Groups** — P1.2 and PΔ300 notation for organizing plans
-- **Constant Folding** — Compile-time evaluation of constant expressions
-- **Dead Code Elimination** — Removes unreachable branches
-- **Type Inference** — Automatic type propagation with explicit annotations
-- **Multi-Error Recovery** — Reports multiple errors per compilation
+- 2D notation, Zuse's original V/K/S row format, with alignment warnings
+- Linearised notation
+- Compiles to C
+- Source provenance tracking, every construct traced to its manuscript source
+- All seven loop variants, W through W6, each with different semantics
+- Quantifiers and iterators, the ∀, ∃, μ, λ operators from Zuse's manuscripts
+- Truth tables, declarative decision tables (ZIA-0368)
+- Plan groups, P1.2 and PΔ300 notation for organising plans
+- Constant folding
+- Dead code elimination
+- Type inference, automatic type propagation with explicit annotations
+- Multi-error recovery
 
 ## A Brief History
 
@@ -42,11 +36,8 @@ This compiler aims to handle both :-)
 | 1945 | Completes language design; manuscript survives the war |
 | 1948 | Writes "Theorie der Angewandten Logistik" formalising the calculus |
 | 1972 | Finally publishes Plankalkül paper (GMD Report) |
-| 2000 | **Prof. Raúl Rojas and FU Berlin team create first implementation** |
+| 2000 | Prof. Raúl Rojas and FU Berlin team create first implementation |
 | 2010 | Bruines provides formal semantics in bachelor thesis |
-| 2025-26 | This compiler, 83 years after the chess programs were written |
-
-The gap between 1945 and 2000 is remarkable. For context: FORTRAN (1957), COBOL (1959), LISP (1958), and nearly every other programming language you've heard of came and went, built their empires, and retired, all before anyone got around to implementing Zuse's work.
 
 ## The 2D Notation
 
@@ -62,12 +53,10 @@ S|   i      i
 This reads as: "Plan takes V0 of type integer, returns R0 of type integer."
 
 The rows mean:
-- **Top row** — The actual operation
-- **V row** — Which variable (V0, R0, Z1, etc.)
-- **K row** — Component index for structured types
-- **S row** — Type annotation (Struktur)
-
-It's barking mad by modern standards, but there's an elegance to it once you've stared at it long enough. Rather like Marmite, or cricket.
+- **Top row**, the actual operation
+- **V row**, which variable (V0, R0, Z1, etc.)
+- **K row**, component index for structured types
+- **S row**, type annotation (Struktur)
 
 ## File Extensions
 
@@ -79,33 +68,23 @@ It's barking mad by modern standards, but there's an elegance to it once you've 
 ## Building
 
 ```bash
-# You'll need OCaml 4.14+ and opam
-opam install dune ppx_deriving alcotest str
+opam install dune ppx_deriving alcotest
 
-# Build
 dune build
-
-# Run unit tests (36 tests)
 dune test
 
-# Run integration tests (14 tests - requires gcc)
+# Integration tests (requires gcc)
 cd test/integration && bash run_tests.sh
 ```
 
 ## Usage
 
 ```bash
-# Compile to C
 plankalkul --emit-c factorial.pk > factorial.c
 gcc -o factorial factorial.c
 
-# Parse and show AST
 plankalkul --parse factorial.pk
-
-# Tokenize only
 plankalkul --lex factorial.pk
-
-# Convert to 2D notation
 plankalkul --emit-2d factorial.pk
 ```
 
@@ -118,21 +97,19 @@ plankalkul-compiler/
 │   ├── lexer/        # Tokenisation (2D and linear)
 │   ├── parser/       # Recursive descent parser
 │   ├── typing/       # Type inference, checking, and plan resolution
-│   ├── codegen/      # C code generation with optimizations
+│   ├── codegen/      # C code generation with optimisations
 │   ├── errors/       # Error types and rendering
 │   ├── provenance/   # Source document tracking
 │   └── bin/          # CLI entry point
 ├── test/
 │   ├── test_*.ml     # Unit tests (lexer, parser, types, codegen)
 │   └── integration/  # End-to-end tests (compile → run → verify)
-│       ├── samples/  # .pk test programs
-│       └── run_tests.sh
-└── doc/
+└── docs/
 ```
 
 ## Source Provenance
 
-This project takes historical accuracy as seriously as possible. Features are traced to their source documents:
+Features are traced to their source documents:
 
 - **Primary (1941-1945)**: Wartime manuscripts from the Zuse Internet Archive
 - **Secondary (1945-1949)**: Post-war formalisations
@@ -161,24 +138,18 @@ When sources conflict, the compiler defers to the earlier manuscript.
 
 ### Implementation References
 
-8. Hovestar Plankalkül Implementation — Reference implementation for linearised notation
-9. Hambly, Z. (2025). plankalkul.py interpreter — Python implementation
+8. Hovestar Plankalkül Implementation, reference implementation for linearised notation
+9. Hambly, Z. (2025). plankalkul.py interpreter, Python implementation
 
 ### Archives
 
-- **Zuse Internet Archive** (ZIA): https://zuse.zib.de — Primary source for manuscript scans
+- **Zuse Internet Archive** (ZIA): https://zuse.zib.de
 
 ## Acknowledgements
 
-This project exists because of the foundational work of many researchers:
-
-**Prof. Raúl Rojas** and the **Freie Universität Berlin team** deserve particular recognition for their 2000 implementation — the first time Plankalkül actually ran on real hardware, more than half a century after Zuse designed it. Their careful scholarship made subsequent work possible.
-
-**Bram Bruines** provided the formal semantics that allow precise reasoning about the language.
-
-**The Zuse Internet Archive** (maintained by the Konrad Zuse Internet Archive at ZIB) preserves the original manuscripts without which this would be archaeology rather than computer science.
-
-And of course, **Konrad Zuse** himself — who, in the midst of the worst war in human history, decided the really pressing problem was how to make machines think systematically. He was right.
+- **Prof. Raúl Rojas** and the **Freie Universität Berlin team**, for the 2000 implementation
+- **Bram Bruines**, for the formal semantics
+- **The Zuse Internet Archive** at ZIB, for preserving the manuscripts
 
 ## Author
 
@@ -188,23 +159,13 @@ And of course, **Konrad Zuse** himself — who, in the midst of the worst war in
 
 ## Related Projects
 
-### This Project
-- [Plankalkül IDE](https://github.com/Zaneham/plankalkul-ide) — VS Code extension with 2D grid editor and LSP
-- [ppm](https://github.com/Zaneham/ppm) — Plankalkül Package Manager
-
-### Historical Resources
-- [Konrad Zuse Internet Archive](https://zuse.zib.de) — Original manuscripts (ZIA-0367, ZIA-0368, ZIA-0410)
-- [Rojas et al. (2000)](http://www.zib.de/zuse/Inhalt/Programme/Plankalkuel/Plankalkuel-Report/Plankalkuel-Report.htm) — "Plankalkül: The First High-Level Programming Language and its Implementation"
-- [Bruines (2010)](https://www.cs.vu.nl/~dick/"; Bruines.pdf) — Formal semantics (bachelor thesis, VU Amsterdam)
-
-### Other Implementations
-- [Hovestar Plankalkül](http://www.hovestar.com/res/plankalkul/) — Reference implementation for linear notation
-- [FU Berlin Implementation](https://www.zib.de/zuse/Inhalt/Programme/Plankalkuel/) — The original 2000 implementation
+- [Plankalkül IDE](https://github.com/Zaneham/plankalkul-ide), VS Code extension with 2D grid editor and LSP
+- [ppm](https://github.com/Zaneham/ppm), Plankalkül Package Manager
+- [Konrad Zuse Internet Archive](https://zuse.zib.de), original manuscripts (ZIA-0367, ZIA-0368, ZIA-0410)
+- [Rojas et al. (2000)](http://www.zib.de/zuse/Inhalt/Programme/Plankalkuel/Plankalkuel-Report/Plankalkuel-Report.htm), "Plankalkül: The First High-Level Programming Language and its Implementation"
+- [Hovestar Plankalkül](http://www.hovestar.com/res/plankalkul/), reference implementation for linear notation
+- [FU Berlin Implementation](https://www.zib.de/zuse/Inhalt/Programme/Plankalkuel/), the original 2000 implementation
 
 ## Licence
 
-MIT — See [LICENSE](LICENSE)
-
----
-
-*"Fin" — as Zuse would say*
+MIT, see [LICENSE](LICENSE)
