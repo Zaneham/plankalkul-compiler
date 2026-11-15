@@ -71,9 +71,88 @@ let c_type_of_typ t =
   | TNumeric A13 -> "double _Complex"  (* Complex *)
   | TArray (_, _) -> "pk_array_t"
   | TMultiArray (_, _) -> "pk_array_t"
-  | TTuple _ -> "pk_tuple_t"
+  | TTuple _ -> "pk_array_t"
   | TUserDefined name -> Printf.sprintf "pk_%s_t" name
   | TInferred -> "int64_t"
+
+let var_types : (var_kind * int, typ) Hashtbl.t = Hashtbl.create 16
+
+let is_structured = function
+  | TArray _ | TMultiArray _ | TTuple _ -> true
+  | _ -> false
+
+let rec leaf_count = function
+  | TArray (n, t) -> n * leaf_count t
+  | TMultiArray (ds, t) -> List.fold_left ( * ) 1 ds * leaf_count t
+  | TTuple ts -> List.fold_left (fun acc t -> acc + leaf_count t) 0 ts
+  | _ -> 1
+
+let index_var_name (iv : var) =
+  Printf.sprintf "pk_%s%d"
+    (match iv.kind with VarV -> "v" | VarZ -> "z" | VarR -> "r")
+    iv.index
+
+let path_elements = function
+  | IndexLiteral is -> List.map (fun i -> IdxLit i) is
+  | IndexVar iv -> [IdxVar iv]
+  | IndexMixed els -> els
+
+let var_label (v : var) =
+  Printf.sprintf "%s%d"
+    (match v.kind with VarV -> "V" | VarZ -> "Z" | VarR -> "R")
+    v.index
+
+let resolve_path (v : var) base_t elems =
+  let step stride (lit, terms) = function
+    | IdxLit n -> (lit + n * stride, terms)
+    | IdxVar iv ->
+      let term =
+        if stride = 1 then index_var_name iv
+        else Printf.sprintf "%s * %d" (index_var_name iv) stride
+      in
+      (lit, terms @ [term])
+  in
+  let into_array n et el off =
+    (match el with
+     | IdxLit k when k < 0 || k >= n ->
+       failwith (Printf.sprintf "%s: component %d is out of range for %d elements"
+                   (var_label v) k n)
+     | _ -> ());
+    (et, step (leaf_count et) off el)
+  in
+  let t, (lit, terms) =
+    List.fold_left (fun (t, off) el ->
+      match t with
+      | TArray (n, et) -> into_array n et el off
+      | TMultiArray ([n], et) -> into_array n et el off
+      | TMultiArray (n :: ds, et) -> into_array n (TMultiArray (ds, et)) el off
+      | TTuple ts ->
+        (match el with
+         | IdxLit k when k >= 0 && k < List.length ts ->
+           let before = List.filteri (fun i _ -> i < k) ts in
+           let skip = List.fold_left (fun acc t -> acc + leaf_count t) 0 before in
+           (List.nth ts k, (fst off + skip, snd off))
+         | IdxLit k ->
+           failwith (Printf.sprintf "%s: component %d is out of range for a %d-component tuple"
+                       (var_label v) k (List.length ts))
+         | IdxVar _ ->
+           failwith (Printf.sprintf "%s: tuple components must be selected by a constant index"
+                       (var_label v)))
+      | _ ->
+        failwith (Printf.sprintf "%s: component index goes deeper than its type"
+                    (var_label v))
+    ) (base_t, (0, [])) elems
+  in
+  let parts = if lit <> 0 || terms = [] then terms @ [string_of_int lit] else terms in
+  (t, String.concat " + " parts)
+
+let var_value_type (v : var) =
+  match Hashtbl.find_opt var_types (v.kind, v.index), v.component with
+  | None, _ -> None
+  | Some t, None -> Some t
+  | Some t, Some c when is_structured t ->
+    Some (fst (resolve_path v t (path_elements c)))
+  | Some _, Some _ -> None
 
 let c_var_name v =
   let prefix = match v.kind with
@@ -84,27 +163,24 @@ let c_var_name v =
   let base = Printf.sprintf "%s%d" prefix v.index in
   match v.component with
   | None -> base
-  | Some (IndexLiteral indices) ->
-    let access = List.fold_left (fun acc i ->
-      Printf.sprintf "%s.data[%d]" acc i
-    ) base indices in
-    access
-  | Some (IndexVar iv) ->
-    let idx_var = Printf.sprintf "pk_%s%d"
-      (match iv.kind with VarV -> "v" | VarZ -> "z" | VarR -> "r")
-      iv.index in
-    Printf.sprintf "%s.data[%s]" base idx_var
-  | Some (IndexMixed elements) ->
-    let access = List.fold_left (fun acc elem ->
-      match elem with
-      | IdxLit n -> Printf.sprintf "%s.data[%d]" acc n
-      | IdxVar iv ->
-        let idx_var = Printf.sprintf "pk_%s%d"
-          (match iv.kind with VarV -> "v" | VarZ -> "z" | VarR -> "r")
-          iv.index in
-        Printf.sprintf "%s.data[%s]" acc idx_var
-    ) base elements in
-    access
+  | Some c ->
+    let elems = path_elements c in
+    (match Hashtbl.find_opt var_types (v.kind, v.index) with
+     | Some t when is_structured t ->
+       let ct, off = resolve_path v t elems in
+       if is_structured ct then
+         Printf.sprintf "((pk_array_t){ .len = %d, .data = %s.data + %s })"
+           (leaf_count ct) base off
+       else
+         Printf.sprintf "%s.data[%s]" base off
+     | _ ->
+       (match elems with
+        | [IdxLit n] -> Printf.sprintf "%s.data[%d]" base n
+        | [IdxVar iv] -> Printf.sprintf "%s.data[%s]" base (index_var_name iv)
+        | _ ->
+          failwith (Printf.sprintf
+            "%s has a %d-level component index but no structured type to resolve it against"
+            (var_label v) (List.length elems))))
 
 let c_binop = function
   | OpAdd -> "+"
@@ -223,31 +299,18 @@ let rec emit_expr expr =
       "1"
   | { expr_desc = ELit (LitBit false); _ } ->
       "0"
-  | { expr_desc = ELit (LitArray elems); _ } ->
-      let emit_lit = function
-        | LitInt n -> Printf.sprintf "%dLL" n
-        | LitFloat f -> Printf.sprintf "%f" f
-        | LitBit true -> "1"
-        | LitBit false -> "0"
-        | LitArray _ -> "/* nested array */"
-        | LitTuple _ -> "/* nested tuple */"
-      in
-      let elems_str = String.concat ", " (List.map emit_lit elems) in
-      Printf.sprintf "(pk_array_t){ .len = %d, .data = (int64_t[]){%s} }"
-        (List.length elems) elems_str
+  | { expr_desc = ELit (LitArray elems); _ }
   | { expr_desc = ELit (LitTuple elems); _ } ->
-      let emit_lit = function
-        | LitInt n -> Printf.sprintf "%dLL" n
-        | LitFloat f -> Printf.sprintf "%f" f
-        | LitBit true -> "1"
-        | LitBit false -> "0"
-        | LitArray _ -> "/* nested array */"
-        | LitTuple _ -> "/* nested tuple */"
+      let rec leaves = function
+        | LitInt n -> [Printf.sprintf "%dLL" n]
+        | LitFloat f -> [Printf.sprintf "%f" f]
+        | LitBit true -> ["1"]
+        | LitBit false -> ["0"]
+        | LitArray ls | LitTuple ls -> List.concat_map leaves ls
       in
-      let fields = List.mapi (fun i lit ->
-        Printf.sprintf "._%d = %s" i (emit_lit lit)
-      ) elems in
-      Printf.sprintf "(pk_tuple_t){ %s }" (String.concat ", " fields)
+      let flat = List.concat_map leaves elems in
+      Printf.sprintf "((pk_array_t){ .len = %d, .data = (int64_t[]){%s} })"
+        (List.length flat) (String.concat ", " flat)
   | { expr_desc = EVar v; _ } ->
       c_var_name v
   | { expr_desc = EBinop (OpImpl, l, r); _ } ->
@@ -390,7 +453,15 @@ let rec emit_stmt e stmt =
   | SEmpty -> ()
 
   | SAssign (expr, var) ->
-      emit e (Printf.sprintf "%s = %s;" (c_var_name var) (emit_expr expr))
+      let sized_by_result = match expr.expr_desc with
+        | EFilterSet _ | EFilterSeq _ -> var.component = None
+        | _ -> false
+      in
+      (match var_value_type var with
+       | Some t when is_structured t && not sized_by_result ->
+         emit e (Printf.sprintf "pk_copy(%s, %s);" (c_var_name var) (emit_expr expr))
+       | _ ->
+         emit e (Printf.sprintf "%s = %s;" (c_var_name var) (emit_expr expr)))
 
   | SConditional (cond, body) ->
       emit e (Printf.sprintf "if (%s) {" (emit_expr cond));
@@ -520,8 +591,8 @@ let rec emit_stmt e stmt =
       (match e.fin_label with
        | Some label -> emit e (Printf.sprintf "goto %s;  /* Fin */" label)
        | None ->
-         if e.loop_depth > 1 then
-           emit e "goto _pk_fin;  /* Fin - nested */"
+         if e.loop_depth = 0 || e.loop_depth > 1 then
+           emit e "goto _pk_fin;  /* Fin */"
          else
            emit e "break;  /* Fin */")
 
@@ -530,13 +601,15 @@ let c_type_of_var v =
   | Some t -> c_type_of_typ t
   | None -> "int64_t"
 
+let own_type (v : var) = if v.component = None then v.typ else None
+
 let rec collect_vars_stmt acc stmt =
   match stmt.stmt_desc with
   | SEmpty | SFin -> acc
   | SAssign (expr, var) ->
     let acc = collect_vars_expr acc expr in
     if var.kind = VarZ || var.kind = VarR then
-      (var.kind, var.index, var.typ) :: acc
+      (var.kind, var.index, own_type var) :: acc
     else acc
   | SConditional (cond, body) ->
     let acc = collect_vars_expr acc cond in
@@ -570,7 +643,7 @@ and collect_vars_expr acc expr =
   | ELit _ -> acc
   | EVar v ->
     if v.kind = VarZ || v.kind = VarR then
-      (v.kind, v.index, v.typ) :: acc
+      (v.kind, v.index, own_type v) :: acc
     else acc
   | EBinop (_, l, r) ->
     let acc = collect_vars_expr acc l in
@@ -603,6 +676,32 @@ let emit_typed_locals e (sig_outputs : var list) body =
     end
   ) vars;
 
+  Hashtbl.iter (fun key typ ->
+    match typ with
+    | Some t when not (Hashtbl.mem var_types key) -> Hashtbl.replace var_types key t
+    | _ -> ()
+  ) tbl;
+
+  let structured = Hashtbl.fold (fun (kind, idx) typ acc ->
+    match typ with
+    | Some t when is_structured t -> (kind, idx, t) :: acc
+    | _ -> acc
+  ) tbl [] in
+  List.iter (fun (kind, idx, _) -> Hashtbl.remove tbl (kind, idx)) structured;
+  let structured = List.sort compare structured in
+  if structured <> [] then emit e "/* Structured values, flattened to leaves */";
+  List.iter (fun (kind, idx, t) ->
+    let n = leaf_count t in
+    match kind with
+    | VarR ->
+      emit e (Printf.sprintf "pk_array_t pk_r%d = { .len = %d, .data = calloc(%d, sizeof(int64_t)) };"
+                idx n n)
+    | VarZ | VarV ->
+      let name = Printf.sprintf "pk_%s%d" (if kind = VarZ then "z" else "v") idx in
+      emit e (Printf.sprintf "int64_t %s_buf[%d] = { 0 };" name n);
+      emit e (Printf.sprintf "pk_array_t %s = { .len = %d, .data = %s_buf };" name n name)
+  ) structured;
+
   let by_type = Hashtbl.create 8 in
   Hashtbl.iter (fun (kind, idx) typ ->
     let c_typ = match typ with
@@ -624,7 +723,6 @@ let emit_typed_locals e (sig_outputs : var list) body =
       let init_val =
         if c_typ = "double" || c_typ = "double _Complex" then "0.0"
         else if c_typ = "pk_array_t" then "{ 0 }"
-        else if c_typ = "pk_tuple_t" then "{ 0 }"
         else "0"
       in
       emit e (Printf.sprintf "%s %s = %s;"
@@ -634,6 +732,12 @@ let emit_typed_locals e (sig_outputs : var list) body =
   end
 
 let emit_plan e (plan : plan) =
+  Hashtbl.reset var_types;
+  List.iter (fun (v : var) ->
+    match v.typ with
+    | Some t -> Hashtbl.replace var_types (v.kind, v.index) t
+    | None -> ()
+  ) (plan.signature.inputs @ plan.signature.outputs);
   let num_outputs = List.length plan.signature.outputs in
   let ret_type = match num_outputs with
     | 0 -> "void"
@@ -771,6 +875,7 @@ let emit_prelude e =
   emit e "#include <stdbool.h>";
   emit e "#include <stdio.h>";
   emit e "#include <stdlib.h>";
+  emit e "#include <string.h>";
   emit e "";
   emit e "/* Platform-specific alloca - MODERN ADDITION for VLA safety */";
   emit e "#ifdef _WIN32";
@@ -781,9 +886,13 @@ let emit_prelude e =
   emit e "";
   emit e "/* Runtime support (minimal) */";
   emit e "typedef struct { size_t len; int64_t* data; } pk_array_t;";
-  emit e "typedef struct { int64_t _0; int64_t _1; } pk_tuple_t;";
   emit e "#define pk_len(a) ((a).len)";
   emit e "#define pk_get(a, i) ((a).data[i])";
+  emit e "static inline void pk_copy(pk_array_t dst, pk_array_t src) {";
+  emit e "  size_t n = dst.len < src.len ? dst.len : src.len;";
+  emit e "  memmove(dst.data, src.data, n * sizeof(int64_t));";
+  emit e "  for (size_t i = n; i < dst.len; i++) dst.data[i] = 0;";
+  emit e "}";
   emit e "";
   emit e "/* Multi-value return support (Zuse's tuple returns) */";
   emit e "typedef struct { int64_t r0; int64_t r1; } pk_result2_t;";
@@ -874,18 +983,13 @@ let emit_main e (plan : plan option) =
          match v.typ with Some t -> not (is_simple_type t) | None -> false
        ) inputs in
 
-       let is_multi_return =
-         List.length outputs > 1 ||
-         (List.length outputs = 1 &&
-          match (List.hd outputs).typ with
-          | Some (TTuple _) -> true
-          | _ -> false) in
+       let is_multi_return = List.length outputs > 1 in
 
        let is_array_return =
          List.length outputs = 1 &&
          match (List.hd outputs).typ with
-         | Some (TArray _) | Some (TMultiArray _) -> true
-         | _ -> false in
+         | Some t -> is_structured t
+         | None -> false in
 
        if List.length inputs = 0 then begin
          if is_array_return then begin
@@ -920,27 +1024,16 @@ let emit_main e (plan : plan option) =
          List.iteri (fun i v ->
            let arg_name = Printf.sprintf "arg%d" i in
            match v.typ with
-           | Some (TArray (_, _)) | Some (TMultiArray (_, _)) ->
-             emit e (Printf.sprintf "/* Array input %d */" i);
-             emit e (Printf.sprintf "int64_t %s_len = (arg_idx < argc) ? atoll(argv[arg_idx++]) : 0LL;" arg_name);
-             emit e (Printf.sprintf "int64_t* %s_data = malloc(%s_len * sizeof(int64_t));" arg_name arg_name);
-             emit e (Printf.sprintf "for (int64_t _i = 0; _i < %s_len && arg_idx < argc; _i++) {" arg_name);
+           | Some t when is_structured t ->
+             let n = leaf_count t in
+             emit e (Printf.sprintf "/* Structured input %d, %d leaves */" i n);
+             emit e (Printf.sprintf "int64_t %s_data[%d] = { 0 };" arg_name n);
+             emit e (Printf.sprintf "for (int64_t _i = 0; _i < %d && arg_idx < argc; _i++) {" n);
              indent e;
              emit e (Printf.sprintf "%s_data[_i] = atoll(argv[arg_idx++]);" arg_name);
              dedent e;
              emit e "}";
-             emit e (Printf.sprintf "pk_array_t %s = { .len = %s_len, .data = %s_data };" arg_name arg_name arg_name)
-           | Some (TTuple ts) ->
-             let n = List.length ts in
-             emit e (Printf.sprintf "/* Tuple input %d (%d members) */" i n);
-             emit e (Printf.sprintf "pk_tuple_t %s = {" arg_name);
-             indent e;
-             for j = 0 to n - 1 do
-               let comma = if j < n - 1 then "," else "" in
-               emit e (Printf.sprintf "._%d = (arg_idx < argc) ? atoll(argv[arg_idx++]) : 0LL%s" j comma)
-             done;
-             dedent e;
-             emit e "};"
+             emit e (Printf.sprintf "pk_array_t %s = { .len = %d, .data = %s_data };" arg_name n arg_name)
            | _ ->
              emit e (Printf.sprintf "int64_t %s = (arg_idx < argc) ? atoll(argv[arg_idx++]) : 0LL;" arg_name)
          ) inputs;
@@ -971,12 +1064,6 @@ let emit_main e (plan : plan option) =
            emit e (Printf.sprintf "int64_t result = pk_%s(%s);" name args);
            emit e "printf(\"Result: %lld\\n\", (long long)result);"
          end;
-         List.iteri (fun i v ->
-           match v.typ with
-           | Some (TArray _) | Some (TMultiArray _) ->
-             emit e (Printf.sprintf "free(arg%d_data);" i)
-           | _ -> ()
-         ) inputs
        end else begin
          emit e "/* Parse command-line arguments */";
          List.iteri (fun i _ ->

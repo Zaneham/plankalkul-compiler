@@ -1,0 +1,4 @@
+; After Zuse's PΔ300 (ZIA-0410 p.9), V0 holds the squares of white king, white rook and black king
+kings_apart (V0[:3*(i,i)]) => R0 {
+  (|V0[0.0] - V0[2.0]| > 1) | (|V0[0.1] - V0[2.1]| > 1) => R0
+}

@@ -1,0 +1,9 @@
+; Sums a 3x3 board with dynamic row and column indices
+board_sum (V0[:3*3*i]) => R0 {
+  0 => R0
+  W1(3) => Z0 {
+    W1(3) => Z1 {
+      R0 + V0[Z0.Z1] => R0
+    }
+  }
+}

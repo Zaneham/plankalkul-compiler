@@ -1,0 +1,4 @@
+; Reads two cells of a 3x3 board, once with Zuse's dotted K path and once with brackets
+board_cell (V0[:3*3*i]) => R0 {
+  V0[1.2] + V0[2][0] * 10 => R0
+}

@@ -1,0 +1,8 @@
+; AΔ1 and AΔ2 from Schachtheorie Anlage 1 (NL 207/0236), AΔ20 from ZIA-0410 p.9
+AΔ1 = S1.3
+AΔ2 = 2 × AΔ1
+AD20 = 3 × AΔ2
+
+kings_apart (V0[:Δ20]) => R0 {
+  (|V0[0.0] - V0[2.0]| > 1) | (|V0[0.1] - V0[2.1]| > 1) => R0
+}

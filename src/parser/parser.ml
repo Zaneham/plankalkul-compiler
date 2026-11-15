@@ -9,6 +9,7 @@ type parser_state = {
   file: string;
   mutable errors: (string * location) list;
   mutable panic_mode: bool;
+  structures: (string, typ) Hashtbl.t;
 }
 
 exception Parse_error of string * location
@@ -19,6 +20,7 @@ let create ?(file="<input>") tokens = {
   file;
   errors = [];
   panic_mode = false;
+  structures = Hashtbl.create 8;
 }
 
 let current state =
@@ -274,22 +276,40 @@ let parse_var state =
     let has_vars = ref false in
     while check state LBRACKET do
       ignore (advance state);
-      let idx_expr = !parse_expr_ref state in
-      let collect_index expr =
-        match expr.expr_desc with
-        | ELit (LitInt n) -> [IdxLit n]
-        | EVar v ->
-          has_vars := true;
-          [IdxVar v]
-        | ELit (LitFloat f) ->
-          let s = Printf.sprintf "%g" f in
-          (try
-            let parts = String.split_on_char '.' s in
-            List.map (fun p -> IdxLit (int_of_string p)) parts
-          with _ -> [IdxLit 0])
-        | _ -> [IdxLit 0]
+      let leading_dot_float () =
+        match (current state).typ with
+        | FLOAT _ -> String.length (current state).lexeme > 0 && (current state).lexeme.[0] = '.'
+        | _ -> false
       in
-      elements := !elements @ collect_index idx_expr;
+      let rec path_element () =
+        let tok = current state in
+        let tloc = tok_to_loc tok in
+        let index_var kind n =
+          ignore (advance state);
+          has_vars := true;
+          elements := !elements @ [IdxVar { kind; index = n; component = None; typ = None; loc = tloc }]
+        in
+        (match tok.typ with
+         | INTEGER n -> ignore (advance state); elements := !elements @ [IdxLit n]
+         | FLOAT _ ->
+           ignore (advance state);
+           let parts = List.filter (fun p -> p <> "") (String.split_on_char '.' tok.lexeme) in
+           List.iter (fun p ->
+             match int_of_string_opt p with
+             | Some n when n >= 0 -> elements := !elements @ [IdxLit n]
+             | _ -> raise (Parse_error ("Bad component index " ^ tok.lexeme, tloc))
+           ) parts
+         | VAR_V n -> index_var VarV n
+         | VAR_Z n -> index_var VarZ n
+         | VAR_R n -> index_var VarR n
+         | _ -> raise (Parse_error ("Component index must be a number or a variable", tloc)));
+        if check state DOT then begin
+          ignore (advance state);
+          path_element ()
+        end else if leading_dot_float () then
+          path_element ()
+      in
+      path_element ();
       if check state COLON then begin
         ignore (advance state);
         while not (check state RBRACKET) && not (check state EOF) do
@@ -308,7 +328,9 @@ let parse_var state =
 
   let typ = if check_any state [TYPE_ANNOT ""] then begin
     let annot_tok = advance state in
-    Some (Ast.Type_parser.parse_type_annotation annot_tok.lexeme)
+    let lookup name = Hashtbl.find_opt state.structures name in
+    (try Some (Ast.Type_parser.parse_type_annotation ~lookup annot_tok.lexeme)
+     with Failure msg -> raise (Parse_error (msg, tok_to_loc annot_tok)))
   end else None in
 
   { kind; index; component; typ; loc }
@@ -967,6 +989,51 @@ let parse_truth_table state =
     table_loc = loc;
   }
 
+let structure_decl_head state =
+  let digits s = s <> "" && String.for_all (fun c -> c >= '0' && c <= '9') s in
+  match (current state).typ with
+  | IDENT "A" when (peek state 1).typ = DELTA ->
+    (match (peek state 2).typ, (peek state 3).typ with
+     | INTEGER n, EQ -> Some (3, n)
+     | _ -> None)
+  | IDENT s when String.length s > 2 && String.sub s 0 2 = "AD"
+                 && digits (String.sub s 2 (String.length s - 2))
+                 && (peek state 1).typ = EQ ->
+    Some (1, int_of_string (String.sub s 2 (String.length s - 2)))
+  | _ -> None
+
+let rec has_inferred = function
+  | TInferred -> true
+  | TArray (_, t) | TMultiArray (_, t) -> has_inferred t
+  | TTuple ts -> List.exists has_inferred ts
+  | _ -> false
+
+let parse_structure_decl state =
+  let loc = tok_to_loc (current state) in
+  match structure_decl_head state with
+  | None -> raise (Parse_error ("Expected a structure declaration", loc))
+  | Some (head_tokens, n) ->
+    for _ = 1 to head_tokens do ignore (advance state) done;
+    ignore (expect state EQ "=");
+    let buf = Buffer.create 32 in
+    let guard = ref 0 in
+    while not (check state NEWLINE) && not (check state EOF) && !guard < 10_000 do
+      incr guard;
+      let tok = advance state in
+      Buffer.add_string buf (match tok.typ with DELTA -> "\xce\x94" | _ -> tok.lexeme)
+    done;
+    let name = Printf.sprintf "\xce\x94%d" n in
+    if Hashtbl.mem state.structures name then
+      raise (Parse_error (Printf.sprintf "A%s is already declared" name, loc));
+    let lookup nm = Hashtbl.find_opt state.structures nm in
+    let t =
+      try Ast.Type_parser.parse_type_string ~lookup (Buffer.contents buf)
+      with Failure msg -> raise (Parse_error (msg, loc))
+    in
+    if has_inferred t then
+      raise (Parse_error (Printf.sprintf "Cannot read the definition of A%s" name, loc));
+    Hashtbl.replace state.structures name t
+
 let parse_program state =
   let plans = ref [] in
   let tables = ref [] in
@@ -977,7 +1044,9 @@ let parse_program state =
     while check state NEWLINE do ignore (advance state) done;
 
     if not (check state EOF) then begin
-      if check state TABLE then begin
+      if structure_decl_head state <> None then
+        ignore (try_parse parse_structure_decl state)
+      else if check state TABLE then begin
         match try_parse parse_truth_table state with
         | Some table -> tables := table :: !tables
         | None -> ()

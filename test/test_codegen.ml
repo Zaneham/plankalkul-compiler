@@ -21,9 +21,9 @@ let test_loop_generation () =
     (contains "for" c_code)
 
 let test_component_access () =
-  let c_code = generate_c "idx (V0) => R0 { V0[2][3] => R0 }" in
-  Alcotest.(check bool) "has .data[2]" true
-    (contains "\\.data\\[2\\]" c_code)
+  let c_code = generate_c "idx (V0[:4*4*i]) => R0 { V0[2][3] => R0 }" in
+  Alcotest.(check bool) "row 2 col 3 of a 4x4 is leaf 11" true
+    (contains "\\.data\\[11\\]" c_code)
 
 let test_delta_plan_comment () =
   let c_code = generate_c "P Delta 1 (V0) => R0 { V0 => R0 }" in

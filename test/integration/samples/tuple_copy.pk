@@ -1,0 +1,5 @@
+; Copies a four-component tuple and reads its first and last components
+tuple_copy (V0[:(i,i,i,i)]) => R0 {
+  V0 => Z0[:(i,i,i,i)]
+  Z0[3] + Z0[0] => R0
+}

@@ -99,44 +99,29 @@ let rec infer_expr env expr =
       (expr.expr_desc, typ)
 
     | EVar v ->
-      let base_typ = match v.typ with
-        | Some t when t <> TInferred -> t
-        | _ ->
-          match TypeEnv.find env (var_key v) with
-          | Some t -> t
-          | None -> default_type
+      let base_typ = match TypeEnv.find env (var_key v) with
+        | Some t -> t
+        | None -> default_type
       in
-      let typ = match v.component with
-        | None -> Some base_typ
-        | Some (IndexLiteral indices) ->
-          let rec strip_dimensions t n =
-            if n <= 0 then t
-            else match t with
-              | TArray (_, elem_t) -> strip_dimensions elem_t (n - 1)
-              | TMultiArray (dims, elem_t) ->
-                if List.length dims <= n then elem_t
-                else TMultiArray (List.filteri (fun i _ -> i >= n) dims, elem_t)
-              | _ -> t
+      let typ = match v.component, v.typ with
+        | None, Some t when t <> TInferred -> Some t
+        | None, _ -> Some base_typ
+        | Some _, Some t when t <> TInferred -> Some t
+        | Some c, _ ->
+          let elems = match c with
+            | IndexLiteral is -> List.map (fun i -> IdxLit i) is
+            | IndexVar iv -> [IdxVar iv]
+            | IndexMixed els -> els
           in
-          Some (strip_dimensions base_typ (List.length indices))
-        | Some (IndexVar _) ->
-          (match base_typ with
-           | TArray (_, elem_t) -> Some elem_t
-           | TMultiArray (_ :: rest, elem_t) ->
-             if rest = [] then Some elem_t
-             else Some (TMultiArray (rest, elem_t))
-           | _ -> Some base_typ)
-        | Some (IndexMixed elements) ->
-          let rec strip_dimensions t n =
-            if n <= 0 then t
-            else match t with
-              | TArray (_, elem_t) -> strip_dimensions elem_t (n - 1)
-              | TMultiArray (dims, elem_t) ->
-                if List.length dims <= n then elem_t
-                else TMultiArray (List.filteri (fun i _ -> i >= n) dims, elem_t)
-              | _ -> t
-          in
-          Some (strip_dimensions base_typ (List.length elements))
+          Some (List.fold_left (fun t el ->
+            match t, el with
+            | TArray (_, et), _ -> et
+            | TMultiArray ([_], et), _ -> et
+            | TMultiArray (_ :: ds, et), _ -> TMultiArray (ds, et)
+            | TTuple ts, IdxLit k when k >= 0 && k < List.length ts -> List.nth ts k
+            | TTuple _, _ -> TInferred
+            | t, _ -> t
+          ) base_typ elems)
       in
       (expr.expr_desc, typ)
 
